@@ -1,0 +1,9 @@
+title: Wind Vector
+description: A 3D visualization of wind patterns across US states
+url: ""
+baseurl: ""
+
+exclude:
+  - Gemfile
+  - Gemfile.lock
+  - README.md
