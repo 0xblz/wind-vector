@@ -93,7 +93,7 @@ textarea {
   border-radius: 0.75rem;
   font-size: 0.8rem;
   pointer-events: none;
-  z-index: 1000;
+  z-index: 1500;
   display: none;
   white-space: nowrap;
   border: 2px solid white;
@@ -105,17 +105,62 @@ textarea {
   display: block;
 }
 
+/* Header */
+#site-header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2.5rem;
+  background: #000;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 1rem;
+  z-index: 2000;
+}
+
+.header-logo {
+  display: flex;
+  align-items: center;
+  text-decoration: none;
+}
+
+.header-logo img {
+  height: 1.25rem;
+  width: auto;
+  opacity: 0.9;
+  transition: opacity 0.2s ease;
+}
+
+.header-logo:hover img {
+  opacity: 1;
+}
+
+.header-link {
+  color: rgba(255, 255, 255, 0.6);
+  text-decoration: none;
+  font-size: 0.8rem;
+  font-weight: 400;
+  transition: color 0.2s ease;
+}
+
+.header-link:hover {
+  color: #fff;
+}
+
 /* App Layout */
 #app-container {
   display: flex;
   width: calc(100vw - 20rem - 12px);
-  height: 100vh;
+  height: calc(100vh - 2.5rem);
   overflow: hidden;
   flex-direction: column;
   margin: 0;
   padding: 0;
   position: fixed;
-  top: 0;
+  top: 2.5rem;
   left: 0;
 }
 
@@ -285,7 +330,7 @@ textarea {
 /* Custom GUI Panel */
 .custom-gui {
   position: fixed;
-  top: 0;
+  top: 2.5rem;
   right: 0;
   bottom: 0;
   width: 20rem;
@@ -327,7 +372,7 @@ textarea {
   -webkit-user-select: none;
   position: fixed;
   z-index: 1001;
-  top: 0;
+  top: 2.5rem;
   bottom: 0;
   right: 20rem;
   left: auto;
@@ -646,7 +691,8 @@ textarea {
 @media screen and (max-width: 800px) {
   #app-container {
     width: 100vw;
-    height: calc(50dvh - 6px);
+    height: calc(50dvh - 6px - 2.5rem / 2);
+    top: 2.5rem;
   }
 
   #map-panel {
@@ -664,12 +710,12 @@ textarea {
     bottom: 0;
     left: 0;
     width: auto;
-    height: calc(50dvh - 6px);
+    height: calc(50dvh - 6px - 2.5rem / 2);
   }
 
   #controls-splitter {
     top: auto;
-    bottom: calc(50dvh - 6px);
+    bottom: calc(50dvh - 6px - 2.5rem / 2);
     left: 0;
     right: 0;
     width: auto;
