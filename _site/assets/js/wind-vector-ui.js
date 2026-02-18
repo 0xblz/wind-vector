@@ -671,6 +671,7 @@ function initApp() {
   ArrowSystem.build();         // instanced arrows (uses arrowGeometry from SceneManager)
   SlabSystem.build();          // flight-level heatmap slab (hidden by default)
   LabelsManager.create();
+  SelectionManager.selectFlightLevel(3); // FL200 selected by default
   UIManager.init();
   EventHandlers.init();
   Splitter.init();
