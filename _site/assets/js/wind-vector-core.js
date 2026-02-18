@@ -22,28 +22,28 @@ const CONSTANTS = {
   },
   COLORS: {
     WIND_SPEED: {
-      CALM: 0x00AA00,
-      LIGHT: 0x66FF66,
-      MODERATE: 0xFFFF00,
-      STRONG: 0xFF8800,
-      VERY_STRONG: 0xFF0000
+      CALM:        0x0d7a54,
+      LIGHT:       0x1db87e,
+      MODERATE:    0xc8a800,
+      STRONG:      0xe05c00,
+      VERY_STRONG: 0xcc0020
     },
     HURRICANE: {
-      EYE: 0x87CEEB,
-      EYEWALL: 0xFF00FF,
-      EYEWALL_INTENSE: 0x8B0000
+      EYE:              0x87CEEB,
+      EYEWALL:          0xFF00FF,
+      EYEWALL_INTENSE:  0x8B0000
     },
     ARROW: 0x00ddff,
     BACKGROUND: {
-      DARK: 0x000000,
+      DARK:  0x000000,
       LIGHT: 0xffffff
     }
   },
   HURRICANE: {
-    CATEGORY_WINDS: [0, 74, 96, 111, 131, 157],
-    EYE_BASE_RADIUS: 0.5,
-    EYE_RADIUS_SCALE: 0.2,
-    EYEWALL_OFFSET: 0.8,
+    CATEGORY_WINDS:    [0, 74, 96, 111, 131, 157],
+    EYE_BASE_RADIUS:   0.5,
+    EYE_RADIUS_SCALE:  0.2,
+    EYEWALL_OFFSET:    0.8,
     SPIRAL_BASE_RADIUS: 8,
     SPIRAL_RADIUS_SCALE: 2
   },
@@ -54,30 +54,30 @@ const CONSTANTS = {
     MAX: 100
   },
   ANIMATION: {
-    OSCILLATION_SPEED: 1.5,
+    OSCILLATION_SPEED:     1.5,
     OSCILLATION_AMPLITUDE: 0.03,
-    MINI_MAP_OSCILLATION: 2
+    MINI_MAP_OSCILLATION:  2
   },
   MAP: {
     TEXTURE_SIZE: 512,
-    GROUND_SIZE: 20
+    GROUND_SIZE:  20
   }
 };
 
 const Config = {
   settings: {
-    state: 'Florida',
-    cubeOpacity: 0.05,
-    mapStyle: 'Terrain',
-    darkBackground: true,
-    showWindArrows: false,
-    currentDate: 'Oct 15, 2024',
-    currentTime: '14:00',
-    thunderstormActive: false,
+    state:                'Florida',
+    cubeOpacity:          0.05,
+    mapStyle:             'Terrain',
+    darkBackground:       true,
+    showWindArrows:       true,
+    currentDate:          'Oct 15, 2024',
+    currentTime:          '14:00',
+    thunderstormActive:   false,
     thunderstormPosition: { x: 0, z: 0 },
-    hurricaneActive: false,
-    hurricanePosition: { x: 0, z: 0 },
-    hurricaneIntensity: 3
+    hurricaneActive:      false,
+    hurricanePosition:    { x: 0, z: 0 },
+    hurricaneIntensity:   3
   }
 };
 
@@ -86,91 +86,121 @@ const Config = {
 // =============================================================================
 
 const AppState = {
-  scene: null,
-  camera: null,
+  scene:    null,
+  camera:   null,
   renderer: null,
   controls: null,
-  windCubes: [],
-  windArrows: [],
-  groundPlane: null,
+
+  // Wind cubes
+  windCubes:    [],
+  windArrows:   [], // kept for compatibility; CSS arrows are removed
+  groundPlane:  null,
   arrowGeometry: null,
   arrowMaterial: null,
-  raycaster: new THREE.Raycaster(),
-  mouse: new THREE.Vector2(),
-  isHovering: false,
+
+  // Instanced mesh systems
+  arrowInstancedMesh: null,
+  particleSystem:     null,
+  particleData:       null,
+  stormParticleSystem: null,
+  stormParticleData:   null,
+
+  // Wind field lookup (populated after generateGrid)
+  windFieldMap: null,
+
+  // Shared materials
+  sharedMaterials:         [],
+  sharedWireframeMaterial: null,
+
+  // Lights (stored for dynamic updates)
+  hemiLight: null,
+  dirLight:  null,
+  fillLight: null,
+
+  // Interaction
+  raycaster:         new THREE.Raycaster(),
+  mouse:             new THREE.Vector2(),
+  isHovering:        false,
   selectedFlightLevel: null,
-  selectedCubes: [],
-  isDragging: false,
+  selectedCubes:     [],
+  isDragging:        false,
   mouseDownPosition: { x: 0, y: 0 },
-  tooltip: null,
-  leafletMap: null,
-  mapCanvas: null,
-  mapContext: null,
-  mapTexture: null,
-  windDataBounds: null,
-  windMapMarkers: [],
+  tooltip:           null,
+
+  // Map
+  leafletMap:      null,
+  mapCanvas:       null,
+  mapContext:      null,
+  mapTexture:      null,
+  windDataBounds:  null,
+  windMapMarkers:  [],
+
+  // Time
   currentDate: new Date(),
   currentTime: {
-    hour: new Date().getHours(),
+    hour:   new Date().getHours(),
     minute: new Date().getMinutes()
   }
 };
+
+// Shared geometry for all cubes (single allocation)
+const _sharedBoxGeometry = new THREE.BoxGeometry(2, 2, 2);
 
 // =============================================================================
 // STATE COORDINATES
 // =============================================================================
 
 const StateCoordinates = {
-  'Alabama': { center: [32.806671, -86.791130], zoom: 7 },
-  'Alaska': { center: [61.370716, -152.404419], zoom: 4 },
-  'Arizona': { center: [33.729759, -111.431221], zoom: 7 },
-  'Arkansas': { center: [34.969704, -92.373123], zoom: 7 },
-  'California': { center: [36.116203, -119.681564], zoom: 6 },
-  'Colorado': { center: [39.059811, -105.311104], zoom: 7 },
-  'Connecticut': { center: [41.597782, -72.755371], zoom: 8 },
-  'Delaware': { center: [39.318523, -75.507141], zoom: 8 },
-  'Florida': { center: [27.766279, -81.686783], zoom: 6 },
-  'Georgia': { center: [33.040619, -83.643074], zoom: 7 },
-  'Hawaii': { center: [21.094318, -157.498337], zoom: 7 },
-  'Idaho': { center: [44.240459, -114.478828], zoom: 6 },
-  'Illinois': { center: [40.349457, -88.986137], zoom: 7 },
-  'Indiana': { center: [39.849426, -86.258278], zoom: 7 },
-  'Iowa': { center: [42.011539, -93.210526], zoom: 7 },
-  'Kansas': { center: [38.526600, -96.726486], zoom: 7 },
-  'Kentucky': { center: [37.668140, -84.670067], zoom: 7 },
-  'Louisiana': { center: [31.169546, -91.867805], zoom: 7 },
-  'Maine': { center: [44.693947, -69.381927], zoom: 7 },
-  'Maryland': { center: [39.063946, -76.802101], zoom: 8 },
-  'Massachusetts': { center: [42.230171, -71.530106], zoom: 8 },
-  'Michigan': { center: [43.326618, -84.536095], zoom: 7 },
-  'Minnesota': { center: [45.694454, -93.900192], zoom: 7 },
-  'Mississippi': { center: [32.741646, -89.678696], zoom: 7 },
-  'Missouri': { center: [38.456085, -92.288368], zoom: 7 },
-  'Montana': { center: [46.921925, -110.454353], zoom: 6 },
-  'Nebraska': { center: [41.125370, -98.268082], zoom: 7 },
-  'Nevada': { center: [38.313515, -117.055374], zoom: 6 },
-  'New Hampshire': { center: [43.452492, -71.563896], zoom: 8 },
-  'New Jersey': { center: [40.298904, -74.521011], zoom: 8 },
-  'New Mexico': { center: [34.840515, -106.248482], zoom: 7 },
-  'New York': { center: [42.165726, -74.948051], zoom: 7 },
-  'North Carolina': { center: [35.630066, -79.806419], zoom: 7 },
-  'North Dakota': { center: [47.528912, -99.784012], zoom: 7 },
-  'Ohio': { center: [40.388783, -82.764915], zoom: 7 },
-  'Oklahoma': { center: [35.565342, -96.928917], zoom: 7 },
-  'Oregon': { center: [44.572021, -122.070938], zoom: 6 },
-  'Pennsylvania': { center: [40.590752, -77.209755], zoom: 7 },
-  'Rhode Island': { center: [41.680893, -71.511780], zoom: 9 },
-  'South Carolina': { center: [33.856892, -80.945007], zoom: 7 },
-  'South Dakota': { center: [44.299782, -99.438828], zoom: 7 },
-  'Tennessee': { center: [35.747845, -86.692345], zoom: 7 },
-  'Texas': { center: [31.054487, -97.563461], zoom: 6 },
-  'Utah': { center: [40.150032, -111.862434], zoom: 7 },
-  'Vermont': { center: [44.045876, -72.710686], zoom: 8 },
-  'Virginia': { center: [37.769337, -78.169968], zoom: 7 },
-  'Washington': { center: [47.400902, -121.490494], zoom: 7 },
-  'West Virginia': { center: [38.491226, -80.954453], zoom: 7 },
-  'Wisconsin': { center: [44.268543, -89.616508], zoom: 7 },
-  'Wyoming': { center: [42.755966, -107.302490], zoom: 7 }
+  'Alabama':       { center: [32.806671,  -86.791130], zoom: 7 },
+  'Alaska':        { center: [61.370716, -152.404419], zoom: 4 },
+  'Arizona':       { center: [33.729759, -111.431221], zoom: 7 },
+  'Arkansas':      { center: [34.969704,  -92.373123], zoom: 7 },
+  'California':    { center: [36.116203, -119.681564], zoom: 6 },
+  'Colorado':      { center: [39.059811, -105.311104], zoom: 7 },
+  'Connecticut':   { center: [41.597782,  -72.755371], zoom: 8 },
+  'Delaware':      { center: [39.318523,  -75.507141], zoom: 8 },
+  'Florida':       { center: [27.766279,  -81.686783], zoom: 6 },
+  'Georgia':       { center: [33.040619,  -83.643074], zoom: 7 },
+  'Hawaii':        { center: [21.094318, -157.498337], zoom: 7 },
+  'Idaho':         { center: [44.240459, -114.478828], zoom: 6 },
+  'Illinois':      { center: [40.349457,  -88.986137], zoom: 7 },
+  'Indiana':       { center: [39.849426,  -86.258278], zoom: 7 },
+  'Iowa':          { center: [42.011539,  -93.210526], zoom: 7 },
+  'Kansas':        { center: [38.526600,  -96.726486], zoom: 7 },
+  'Kentucky':      { center: [37.668140,  -84.670067], zoom: 7 },
+  'Louisiana':     { center: [31.169546,  -91.867805], zoom: 7 },
+  'Maine':         { center: [44.693947,  -69.381927], zoom: 7 },
+  'Maryland':      { center: [39.063946,  -76.802101], zoom: 8 },
+  'Massachusetts': { center: [42.230171,  -71.530106], zoom: 8 },
+  'Michigan':      { center: [43.326618,  -84.536095], zoom: 7 },
+  'Minnesota':     { center: [45.694454,  -93.900192], zoom: 7 },
+  'Mississippi':   { center: [32.741646,  -89.678696], zoom: 7 },
+  'Missouri':      { center: [38.456085,  -92.288368], zoom: 7 },
+  'Montana':       { center: [46.921925, -110.454353], zoom: 6 },
+  'Nebraska':      { center: [41.125370,  -98.268082], zoom: 7 },
+  'Nevada':        { center: [38.313515, -117.055374], zoom: 6 },
+  'New Hampshire': { center: [43.452492,  -71.563896], zoom: 8 },
+  'New Jersey':    { center: [40.298904,  -74.521011], zoom: 8 },
+  'New Mexico':    { center: [34.840515, -106.248482], zoom: 7 },
+  'New York':      { center: [42.165726,  -74.948051], zoom: 7 },
+  'North Carolina':{ center: [35.630066,  -79.806419], zoom: 7 },
+  'North Dakota':  { center: [47.528912,  -99.784012], zoom: 7 },
+  'Ohio':          { center: [40.388783,  -82.764915], zoom: 7 },
+  'Oklahoma':      { center: [35.565342,  -96.928917], zoom: 7 },
+  'Oregon':        { center: [44.572021, -122.070938], zoom: 6 },
+  'Pennsylvania':  { center: [40.590752,  -77.209755], zoom: 7 },
+  'Rhode Island':  { center: [41.680893,  -71.511780], zoom: 9 },
+  'South Carolina':{ center: [33.856892,  -80.945007], zoom: 7 },
+  'South Dakota':  { center: [44.299782,  -99.438828], zoom: 7 },
+  'Tennessee':     { center: [35.747845,  -86.692345], zoom: 7 },
+  'Texas':         { center: [31.054487,  -97.563461], zoom: 6 },
+  'Utah':          { center: [40.150032, -111.862434], zoom: 7 },
+  'Vermont':       { center: [44.045876,  -72.710686], zoom: 8 },
+  'Virginia':      { center: [37.769337,  -78.169968], zoom: 7 },
+  'Washington':    { center: [47.400902, -121.490494], zoom: 7 },
+  'West Virginia': { center: [38.491226,  -80.954453], zoom: 7 },
+  'Wisconsin':     { center: [44.268543,  -89.616508], zoom: 7 },
+  'Wyoming':       { center: [42.755966, -107.302490], zoom: 7 }
 };
 
 function calculateSquareBounds(center, size) {
@@ -191,20 +221,20 @@ function getStateData(stateName) {
   const bounds = calculateSquareBounds(state.center, boundsSize);
 
   return {
-    center: state.center,
-    zoom: state.zoom,
-    bounds: bounds,
+    center:      state.center,
+    zoom:        state.zoom,
+    bounds:      bounds,
     windPattern: determineWindPattern(state.center)
   };
 }
 
 function determineWindPattern(center) {
   const [lat, lng] = center;
-  if (lng < -120) return 'pacific';
-  if (lat > 40 && lng > -85) return 'nor_easter';
-  if (lat < 35 && lng > -90) return 'gulf_stream';
+  if (lng < -120)              return 'pacific';
+  if (lat > 40 && lng > -85)   return 'nor_easter';
+  if (lat < 35 && lng > -90)   return 'gulf_stream';
   if (lng > -105 && lng < -90) return 'plains';
-  if (lat < 40 && lng < -105) return 'desert';
+  if (lat < 40 && lng < -105)  return 'desert';
   return 'continental';
 }
 
@@ -214,26 +244,27 @@ function determineWindPattern(center) {
 
 const Utils = {
   formatDate: (date) => date.toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric'
+    month: 'short', day: 'numeric', year: 'numeric'
   }),
 
-  formatTime: (timeObj) => `${timeObj.hour.toString().padStart(2, '0')}:${timeObj.minute.toString().padStart(2, '0')}`,
+  formatTime: (timeObj) =>
+    `${timeObj.hour.toString().padStart(2, '0')}:${timeObj.minute.toString().padStart(2, '0')}`,
 
-  getWindSpeedColor(speed, stormType = null, distanceFromCenter = Infinity, isStormCore = false) {
+  getWindSpeedColor(speed, stormType, distanceFromCenter, isStormCore) {
+    distanceFromCenter = distanceFromCenter !== undefined ? distanceFromCenter : Infinity;
+    isStormCore        = isStormCore || false;
+
     if (stormType === 'hurricane') {
       const { EYE_BASE_RADIUS, EYE_RADIUS_SCALE, EYEWALL_OFFSET, SPIRAL_BASE_RADIUS, SPIRAL_RADIUS_SCALE } = CONSTANTS.HURRICANE;
-      const eyeRadius = EYE_BASE_RADIUS + (Config.settings.hurricaneIntensity * EYE_RADIUS_SCALE);
+      const eyeRadius    = EYE_BASE_RADIUS + (Config.settings.hurricaneIntensity * EYE_RADIUS_SCALE);
       const eyeWallRadius = eyeRadius + EYEWALL_OFFSET;
-      const spiralRadius = SPIRAL_BASE_RADIUS + (Config.settings.hurricaneIntensity * SPIRAL_RADIUS_SCALE);
+      const spiralRadius  = SPIRAL_BASE_RADIUS + (Config.settings.hurricaneIntensity * SPIRAL_RADIUS_SCALE);
 
-      if (distanceFromCenter < eyeRadius) return new THREE.Color(CONSTANTS.COLORS.HURRICANE.EYE);
+      if (distanceFromCenter < eyeRadius)    return new THREE.Color(CONSTANTS.COLORS.HURRICANE.EYE);
       if (distanceFromCenter < eyeWallRadius) {
         const intensity = 1 - ((distanceFromCenter - eyeRadius) / (eyeWallRadius - eyeRadius));
-        const color = new THREE.Color(CONSTANTS.COLORS.HURRICANE.EYEWALL).lerp(new THREE.Color(CONSTANTS.COLORS.HURRICANE.EYEWALL_INTENSE), intensity);
-        const pulseIntensity = (Math.sin(Date.now() * 0.003) + 1) * 0.5;
-        return color.multiplyScalar(0.8 + pulseIntensity * 0.2);
+        return new THREE.Color(CONSTANTS.COLORS.HURRICANE.EYEWALL)
+          .lerp(new THREE.Color(CONSTANTS.COLORS.HURRICANE.EYEWALL_INTENSE), intensity);
       }
       if (distanceFromCenter < spiralRadius) {
         const bandIntensity = 1 - ((distanceFromCenter - eyeWallRadius) / (spiralRadius - eyeWallRadius));
@@ -245,13 +276,12 @@ const Utils = {
 
     if (stormType === 'thunderstorm') {
       if (isStormCore) {
-        const color = new THREE.Color(CONSTANTS.COLORS.WIND_SPEED.VERY_STRONG);
-        const pulseIntensity = (Math.sin(Date.now() * 0.002) + 1) * 0.5;
-        return color.multiplyScalar(0.7 + pulseIntensity * 0.3);
+        return new THREE.Color(CONSTANTS.COLORS.WIND_SPEED.VERY_STRONG);
       }
       if (distanceFromCenter < 5) {
         const intensity = Math.max(0.5, 1 - (distanceFromCenter / 5));
-        return new THREE.Color(CONSTANTS.COLORS.WIND_SPEED.STRONG).lerp(new THREE.Color(CONSTANTS.COLORS.WIND_SPEED.VERY_STRONG), intensity);
+        return new THREE.Color(CONSTANTS.COLORS.WIND_SPEED.STRONG)
+          .lerp(new THREE.Color(CONSTANTS.COLORS.WIND_SPEED.VERY_STRONG), intensity);
       }
     }
 
@@ -265,29 +295,24 @@ const Utils = {
     return COLORS.VERY_STRONG;
   },
 
-  normalizeGridPosition: (worldPos) => (worldPos + CONSTANTS.GRID.RANGE + 1) / (2 * CONSTANTS.GRID.RANGE + 2),
-  calculateDistance: (pos1, pos2) => Math.sqrt((pos1.x - pos2.x) ** 2 + (pos1.z - pos2.z) ** 2),
+  normalizeGridPosition: (worldPos) =>
+    (worldPos + CONSTANTS.GRID.RANGE + 1) / (2 * CONSTANTS.GRID.RANGE + 2),
+
+  calculateDistance: (pos1, pos2) =>
+    Math.sqrt((pos1.x - pos2.x) ** 2 + (pos1.z - pos2.z) ** 2),
+
   getRandomPosition: () => ({ x: Math.random() * 16 - 8, z: Math.random() * 16 - 8 }),
-
-  createArrowElement(className = 'mini-map-arrow') {
-    const arrow = document.createElement('div');
-    arrow.className = className;
-    return arrow;
-  },
-
-  applyElementStyles(element, styles) {
-    Object.assign(element.style, styles);
-  },
 
   worldToScreen(position, camera, renderer) {
     const vector = new THREE.Vector3().copy(position).project(camera);
     const canvas = renderer.domElement;
-    const rect = canvas.getBoundingClientRect();
+    const rect   = canvas.getBoundingClientRect();
 
-    const screenX = (vector.x * 0.5 + 0.5) * rect.width + rect.left;
+    const screenX = (vector.x * 0.5 + 0.5) * rect.width  + rect.left;
     const screenY = (-vector.y * 0.5 + 0.5) * rect.height + rect.top;
 
-    return (vector.z < 1 && screenX >= rect.left && screenX <= rect.right && screenY >= rect.top && screenY <= rect.bottom)
+    return (vector.z < 1 && screenX >= rect.left && screenX <= rect.right &&
+            screenY >= rect.top  && screenY <= rect.bottom)
       ? { x: screenX, y: screenY }
       : null;
   }
@@ -299,7 +324,8 @@ const Utils = {
 
 const WindCalculator = {
   generateDirection(x, y, z, windPattern) {
-    const flightLevel = CONSTANTS.FLIGHT_LEVELS.MIN + ((y / CONSTANTS.GRID.SPACING) * CONSTANTS.FLIGHT_LEVELS.INCREMENT);
+    const flightLevel = CONSTANTS.FLIGHT_LEVELS.MIN +
+      ((y / CONSTANTS.GRID.SPACING) * CONSTANTS.FLIGHT_LEVELS.INCREMENT);
     let directionAngle = 0;
 
     if (Config.settings.hurricaneActive) {
@@ -313,7 +339,74 @@ const WindCalculator = {
     directionAngle += this.getTimeBasedVariation(x, y, z);
 
     const angleRad = (directionAngle * Math.PI) / 180;
-    return new THREE.Vector3(Math.cos(angleRad), 0, Math.sin(angleRad)).normalize();
+    const hx = Math.cos(angleRad);
+    const hz = Math.sin(angleRad);
+    const vy = this.calculateVerticalComponent(x, y, z);
+
+    return new THREE.Vector3(hx, vy, hz).normalize();
+  },
+
+  calculateVerticalComponent(x, y, z) {
+    if (Config.settings.hurricaneActive) {
+      return this.hurricaneVertical(x, y, z);
+    }
+    if (Config.settings.thunderstormActive) {
+      return this.thunderstormVertical(x, y, z);
+    }
+    // Normal conditions: thermal lifting and subsidence zones across the grid.
+    // Range ~±0.35 gives ~17° of visible tilt after normalization.
+    const maxY       = CONSTANTS.FLIGHT_LEVELS.COUNT * CONSTANTS.GRID.SPACING;
+    const altFraction = y / maxY;
+    // Spatial pattern: alternating rising/sinking columns, stronger at low altitude
+    const pattern = Math.sin(x * 0.5 + z * 0.4) * 0.25
+                  + Math.cos(x * 0.35 - z * 0.5) * 0.15;
+    return pattern * (1 - altFraction * 0.5);
+  },
+
+  hurricaneVertical(x, y, z) {
+    const dist = Utils.calculateDistance({ x, z }, Config.settings.hurricanePosition);
+    const { EYE_BASE_RADIUS, EYE_RADIUS_SCALE, EYEWALL_OFFSET, SPIRAL_BASE_RADIUS, SPIRAL_RADIUS_SCALE } = CONSTANTS.HURRICANE;
+    const eyeR     = EYE_BASE_RADIUS + Config.settings.hurricaneIntensity * EYE_RADIUS_SCALE;
+    const eyeWallR = eyeR + EYEWALL_OFFSET;
+    const spiralR  = SPIRAL_BASE_RADIUS + Config.settings.hurricaneIntensity * SPIRAL_RADIUS_SCALE;
+    const maxY     = CONSTANTS.FLIGHT_LEVELS.COUNT * CONSTANTS.GRID.SPACING;
+
+    if (dist < eyeR) {
+      // Eye: warm-core subsidence — air sinks strongly
+      return -0.6;
+    }
+    if (dist < eyeWallR) {
+      // Eyewall: powerful updraft, strongest near surface, weakens aloft
+      const altFactor = 1 - (y / maxY) * 0.5;
+      return 0.9 * altFactor;
+    }
+    if (dist < spiralR) {
+      // Spiral rain bands: moderate updraft
+      const bandIntensity = 1 - ((dist - eyeWallR) / (spiralR - eyeWallR));
+      return 0.5 * bandIntensity;
+    }
+    // Upper outflow: arrows tilt downward and outward
+    if (y > maxY * 0.7) return -0.35;
+    // Low-level inflow: slight downward convergence
+    return -0.1;
+  },
+
+  thunderstormVertical(x, y, z) {
+    const dist           = Utils.calculateDistance({ x, z }, Config.settings.thunderstormPosition);
+    const maxY           = CONSTANTS.FLIGHT_LEVELS.COUNT * CONSTANTS.GRID.SPACING;
+    const stormInfluence = Math.exp(-dist / 3);
+    // Updraft strongest at mid-altitude (anvil shape)
+    const altFactor      = Math.sin((y / maxY) * Math.PI);
+
+    if (dist < 2) {
+      // Core: dramatic vertical arrow tilt
+      return 0.95 * altFactor + 0.2;
+    }
+    if (dist < 5) {
+      return 0.6 * stormInfluence * altFactor;
+    }
+    // Compensating subsidence surrounds the storm
+    return -0.25 * stormInfluence;
   },
 
   calculateHurricaneEffect(x, y, z) {
@@ -322,31 +415,30 @@ const WindCalculator = {
     const distanceFromCenter = Utils.calculateDistance({ x, z }, Config.settings.hurricanePosition);
 
     const { EYE_BASE_RADIUS, EYE_RADIUS_SCALE, EYEWALL_OFFSET, SPIRAL_BASE_RADIUS, SPIRAL_RADIUS_SCALE } = CONSTANTS.HURRICANE;
-    const eyeRadius = EYE_BASE_RADIUS + (Config.settings.hurricaneIntensity * EYE_RADIUS_SCALE);
+    const eyeRadius     = EYE_BASE_RADIUS + (Config.settings.hurricaneIntensity * EYE_RADIUS_SCALE);
     const eyeWallRadius = eyeRadius + EYEWALL_OFFSET;
-    const spiralRadius = SPIRAL_BASE_RADIUS + (Config.settings.hurricaneIntensity * SPIRAL_RADIUS_SCALE);
+    const spiralRadius  = SPIRAL_BASE_RADIUS + (Config.settings.hurricaneIntensity * SPIRAL_RADIUS_SCALE);
 
     if (distanceFromCenter < eyeRadius) return Math.random() * 60 - 30;
 
     const hurricaneAngle = Math.atan2(dz, dx) * 180 / Math.PI;
 
     if (distanceFromCenter < eyeWallRadius) {
-      const rotationAngle = hurricaneAngle + 90;
-      const spiralAngle = rotationAngle - 15;
+      const spiralAngle  = hurricaneAngle + 90 - 15;
       const altitudeEffect = Math.sin((y / 10) * Math.PI) * 10;
       return spiralAngle + altitudeEffect;
     }
 
     if (distanceFromCenter < spiralRadius) {
       const spiralIntensity = 1 - ((distanceFromCenter - eyeWallRadius) / (spiralRadius - eyeWallRadius));
-      const spiralAngle = hurricaneAngle + 90 - (30 * spiralIntensity);
-      const bandEffect = Math.sin(distanceFromCenter * 2 + hurricaneAngle * 0.1) * 15;
-      const shearEffect = (y > 6) ? (y - 6) * 5 : 0;
+      const spiralAngle   = hurricaneAngle + 90 - (30 * spiralIntensity);
+      const bandEffect    = Math.sin(distanceFromCenter * 2 + hurricaneAngle * 0.1) * 15;
+      const shearEffect   = (y > 6) ? (y - 6) * 5 : 0;
       return spiralAngle + bandEffect + shearEffect;
     }
 
     if (y > 8) {
-      const outflowAngle = hurricaneAngle - 90;
+      const outflowAngle     = hurricaneAngle - 90;
       const outflowIntensity = Math.exp(-(distanceFromCenter - spiralRadius) / 3);
       return outflowAngle * outflowIntensity * 0.3;
     }
@@ -359,10 +451,10 @@ const WindCalculator = {
     const dz = z - Config.settings.thunderstormPosition.z;
     const distanceFromStorm = Utils.calculateDistance({ x, z }, Config.settings.thunderstormPosition);
 
-    const stormAngle = Math.atan2(dz, dx) * 180 / Math.PI;
+    const stormAngle       = Math.atan2(dz, dx) * 180 / Math.PI;
     const rotationStrength = Math.exp(-distanceFromStorm / 3) * 180;
     const verticalComponent = Math.sin((y / 10) * Math.PI) * 45;
-    const turbulence = (Math.sin(x * 3 + y * 2 + z * 2.5) + Math.cos(x * 2 + y * 2.5 + z * 2)) * 30;
+    const turbulence       = (Math.sin(x * 3 + y * 2 + z * 2.5) + Math.cos(x * 2 + y * 2.5 + z * 2)) * 30;
 
     let effect = stormAngle + rotationStrength + verticalComponent + turbulence;
     if (distanceFromStorm < 3) effect += Math.random() * 60 - 30;
@@ -372,22 +464,22 @@ const WindCalculator = {
 
   getAltitudeWindPattern(flightLevel, x, z) {
     const patterns = [
-      { max: 100, fn: () => Math.sin((x + z) * 0.6) * 25 + Math.cos(x * 0.8) * 15 },
-      { max: 200, fn: () => Math.sin((x - z) * 0.4) * 20 + Math.cos(z * 0.7) * 18 },
-      { max: 300, fn: () => Math.cos((x + z) * 0.3) * 15 + Math.sin(x * 0.5) * 12 },
-      { max: 400, fn: () => 30 + Math.sin(z * 0.2) * 10 + Math.cos(x * 0.3) * 8 },
+      { max: 100,      fn: () => Math.sin((x + z) * 0.6) * 25 + Math.cos(x * 0.8) * 15 },
+      { max: 200,      fn: () => Math.sin((x - z) * 0.4) * 20 + Math.cos(z * 0.7) * 18 },
+      { max: 300,      fn: () => Math.cos((x + z) * 0.3) * 15 + Math.sin(x * 0.5) * 12 },
+      { max: 400,      fn: () => 30 + Math.sin(z * 0.2) * 10 + Math.cos(x * 0.3) * 8  },
       { max: Infinity, fn: () => 45 + Math.cos((x - z) * 0.2) * 12 + Math.sin(x * 0.25) * 6 }
     ];
     return patterns.find(p => flightLevel <= p.max).fn();
   },
 
   getRegionalWindPattern(pattern, x, y, z) {
-    const timeSeed = AppState.currentDate.getTime() + AppState.currentTime.hour;
+    const timeSeed    = AppState.currentDate.getTime() + AppState.currentTime.hour;
     const seededRandom = (Math.sin(timeSeed + x * 1000 + y * 100 + z * 10) + 1) / 2;
     const randomFactor = Math.sin(timeSeed * 0.001 + x * 0.3 + y * 0.5 + z * 0.7) * 15;
 
     const patterns = {
-      'nor_easter': () => (z * 2) + Math.sin(y * 0.8) * 15 + (seededRandom * 18 - 9),
+      'nor_easter':  () => (z * 2) + Math.sin(y * 0.8) * 15 + (seededRandom * 18 - 9),
       'gulf_stream': () => (x * 1.2) + Math.cos(y * 0.6) * 12 + (seededRandom * 16 - 8),
       'continental': () => (x + z) * 0.8 + Math.sin(y * 0.5) * 18 + (seededRandom * 22 - 11),
       'desert': () => {
@@ -413,8 +505,8 @@ const WindCalculator = {
     const baseSpeed = 10 + (y * CONSTANTS.WIND_SPEED.BASE_ALTITUDE_FACTOR);
     let speed = baseSpeed;
 
-    const hourFactor = Math.sin((AppState.currentTime.hour / 24) * 2 * Math.PI) * 5;
-    const dayOfYear = Math.floor((AppState.currentDate - new Date(AppState.currentDate.getFullYear(), 0, 0)) / 1000 / 60 / 60 / 24);
+    const hourFactor   = Math.sin((AppState.currentTime.hour / 24) * 2 * Math.PI) * 5;
+    const dayOfYear    = Math.floor((AppState.currentDate - new Date(AppState.currentDate.getFullYear(), 0, 0)) / 1000 / 60 / 60 / 24);
     const seasonalFactor = Math.cos((dayOfYear / 365) * 2 * Math.PI) * 8;
 
     if (Config.settings.hurricaneActive) {
@@ -431,14 +523,12 @@ const WindCalculator = {
   calculateHurricaneSpeed(x, y, z) {
     const distanceFromCenter = Utils.calculateDistance({ x, z }, Config.settings.hurricanePosition);
     const { EYE_BASE_RADIUS, EYE_RADIUS_SCALE, EYEWALL_OFFSET, SPIRAL_BASE_RADIUS, SPIRAL_RADIUS_SCALE, CATEGORY_WINDS } = CONSTANTS.HURRICANE;
-    const eyeRadius = EYE_BASE_RADIUS + (Config.settings.hurricaneIntensity * EYE_RADIUS_SCALE);
+    const eyeRadius     = EYE_BASE_RADIUS + (Config.settings.hurricaneIntensity * EYE_RADIUS_SCALE);
     const eyeWallRadius = eyeRadius + EYEWALL_OFFSET;
-    const spiralRadius = SPIRAL_BASE_RADIUS + (Config.settings.hurricaneIntensity * SPIRAL_RADIUS_SCALE);
-    const maxWind = CATEGORY_WINDS[Config.settings.hurricaneIntensity];
+    const spiralRadius  = SPIRAL_BASE_RADIUS + (Config.settings.hurricaneIntensity * SPIRAL_RADIUS_SCALE);
+    const maxWind       = CATEGORY_WINDS[Config.settings.hurricaneIntensity];
 
-    if (distanceFromCenter < eyeRadius) {
-      return 5 + Math.random() * 10;
-    }
+    if (distanceFromCenter < eyeRadius)     return 5 + Math.random() * 10;
 
     if (distanceFromCenter < eyeWallRadius) {
       const eyeWallIntensity = 1 - ((distanceFromCenter - eyeRadius) / (eyeWallRadius - eyeRadius));
@@ -450,9 +540,9 @@ const WindCalculator = {
     }
 
     if (distanceFromCenter < spiralRadius) {
-      const bandIntensity = 1 - ((distanceFromCenter - eyeWallRadius) / (spiralRadius - eyeWallRadius));
+      const bandIntensity  = 1 - ((distanceFromCenter - eyeWallRadius) / (spiralRadius - eyeWallRadius));
       let speed = maxWind * 0.3 + (maxWind * 0.4 * bandIntensity);
-      const bandVariation = Math.sin(distanceFromCenter * 1.5 + Date.now() * 0.001) * 15;
+      const bandVariation  = Math.sin(distanceFromCenter * 1.5) * 15;
       const feederBandEffect = Math.cos(distanceFromCenter * 0.8) * 10;
       return speed + bandVariation + feederBandEffect;
     }
@@ -470,10 +560,10 @@ const WindCalculator = {
 
   calculateThunderstormSpeed(x, y, z) {
     const distanceFromStorm = Utils.calculateDistance({ x, z }, Config.settings.thunderstormPosition);
-    const stormInfluence = Math.exp(-distanceFromStorm / 4);
+    const stormInfluence    = Math.exp(-distanceFromStorm / 4);
     const verticalDevelopment = Math.sin((y / 10) * Math.PI) * 30;
-    const turbulence = (Math.sin(x * 2.5 + y * 1.8 + z * 2.2) + Math.cos(x * 1.8 + y * 2.2 + z * 1.5)) * 15;
-    const stormEffect = (verticalDevelopment + turbulence) * stormInfluence;
+    const turbulence        = (Math.sin(x * 2.5 + y * 1.8 + z * 2.2) + Math.cos(x * 1.8 + y * 2.2 + z * 1.5)) * 15;
+    const stormEffect       = (verticalDevelopment + turbulence) * stormInfluence;
 
     let additionalSpeed = stormEffect;
     if (distanceFromStorm < 3 && y > 2) {
@@ -484,20 +574,20 @@ const WindCalculator = {
   },
 
   getRegionalSpeedModifier(pattern, x, y, z) {
-    const timeSeed = AppState.currentDate.getTime() + AppState.currentTime.hour;
+    const timeSeed     = AppState.currentDate.getTime() + AppState.currentTime.hour;
     const seededRandom = (Math.sin(timeSeed + x * 1000 + y * 100 + z * 10) + 1) / 2;
 
     const patterns = {
-      'nor_easter': () => (x + 10) * 1.8 + Math.sin(z * 0.4) * 8 + (seededRandom * 18 - 9),
+      'nor_easter':  () => (x + 10) * 1.8 + Math.sin(z * 0.4) * 8 + (seededRandom * 18 - 9),
       'gulf_stream': () => Math.sin((z + 10) * 0.3) * 12 + (seededRandom * 16 - 8),
       'continental': () => Math.cos(x * 0.6) * Math.sin(z * 0.5) * 15 + (seededRandom * 22 - 11),
       'desert': () => {
         const thermalEffect = Math.abs(x) + Math.abs(z);
-        const thermalBoost = AppState.currentTime.hour >= 10 && AppState.currentTime.hour <= 16 ? 8 : 0;
+        const thermalBoost  = AppState.currentTime.hour >= 10 && AppState.currentTime.hour <= 16 ? 8 : 0;
         return thermalEffect * 0.8 + Math.sin(y * 0.4) * 10 + (seededRandom * 14 - 7) + thermalBoost;
       },
       'pacific': () => (10 - x) * 2.0 + Math.cos(y * 0.3) * 6 + (seededRandom * 16 - 8),
-      'plains': () => Math.sin((x + z) * 0.4) * 12 + (seededRandom * 25 - 12.5)
+      'plains':  () => Math.sin((x + z) * 0.4) * 12 + (seededRandom * 25 - 12.5)
     };
 
     return patterns[pattern] ? patterns[pattern]() : 0;
@@ -520,74 +610,49 @@ const WindGenerator = {
       for (let y = 0; y < CONSTANTS.FLIGHT_LEVELS.COUNT; y++) {
         for (let z = -CONSTANTS.GRID.RANGE; z <= CONSTANTS.GRID.RANGE; z += CONSTANTS.GRID.SPACING) {
           const flightLevel = CONSTANTS.FLIGHT_LEVELS.MIN + (y * CONSTANTS.FLIGHT_LEVELS.INCREMENT);
-          const speed = WindCalculator.calculateSpeed(windPattern, x, y * CONSTANTS.GRID.SPACING, z);
+          const speed       = WindCalculator.calculateSpeed(windPattern, x, y * CONSTANTS.GRID.SPACING, z);
           this.createCube(x, y * CONSTANTS.GRID.SPACING, z, Math.round(speed), flightLevel);
         }
       }
     }
+
+    // Build O(1) wind direction lookup map
+    AppState.windFieldMap = new Map();
+    AppState.windCubes.forEach(cube => {
+      const key = `${cube.position.x},${cube.position.y},${cube.position.z}`;
+      AppState.windFieldMap.set(key, cube.userData.windDirection);
+    });
   },
 
   clearExisting() {
     AppState.windCubes.forEach(cube => AppState.scene.remove(cube));
-    AppState.windArrows.forEach(arrow => arrow.parentNode?.removeChild(arrow));
-    AppState.windCubes = [];
-    AppState.windArrows = [];
+    AppState.windCubes  = [];
+    AppState.windArrows = []; // compatibility stub — no DOM arrows any more
   },
 
   createCube(x, y, z, speed, flightLevel) {
-    const geometry = new THREE.BoxGeometry(2, 2, 2);
     const stateData = getStateData(Config.settings.state);
     if (!stateData) return;
 
-    const windPattern = stateData.windPattern;
+    const windPattern   = stateData.windPattern;
     const windDirection = WindCalculator.generateDirection(x, y, z, windPattern);
 
-    let color, stormType = null, distanceFromCenter = Infinity, isStormCore = false;
+    // Clone from pool so each cube owns its material — required for per-cube opacity control
+    const material = (AppState.sharedMaterials && AppState.sharedMaterials.length)
+      ? MaterialPool.getMaterial(speed).clone()
+      : new THREE.MeshLambertMaterial({
+          color: CONSTANTS.COLORS.WIND_SPEED.CALM,
+          transparent: true,
+          opacity: Config.settings.cubeOpacity
+        });
+    material.opacity = Config.settings.cubeOpacity;
 
-    if (Config.settings.hurricaneActive) {
-      stormType = 'hurricane';
-      distanceFromCenter = Utils.calculateDistance({ x, z }, Config.settings.hurricanePosition);
-    } else if (Config.settings.thunderstormActive) {
-      stormType = 'thunderstorm';
-      distanceFromCenter = Utils.calculateDistance({ x, z }, Config.settings.thunderstormPosition);
-      isStormCore = distanceFromCenter < 3 && y > 2;
-    }
-
-    color = Utils.getWindSpeedColor(speed, stormType, distanceFromCenter, isStormCore);
-
-    const material = new THREE.MeshLambertMaterial({
-      color: color,
-      transparent: true,
-      opacity: Config.settings.cubeOpacity
-    });
-
-    const cube = new THREE.Mesh(geometry, material);
+    const cube = new THREE.Mesh(_sharedBoxGeometry, material);
     cube.position.set(x, y, z);
     cube.userData = { speed, flightLevel, yLevel: y / CONSTANTS.GRID.SPACING, windDirection };
 
-    const arrow = this.createArrow(cube, windDirection, speed);
-
     AppState.scene.add(cube);
     AppState.windCubes.push(cube);
-    AppState.windArrows.push(arrow);
-  },
-
-  createArrow(cube, windDirection, speed) {
-    const arrow = Utils.createArrowElement('wind-arrow-3d');
-    Utils.applyElementStyles(arrow, { position: 'absolute', display: 'none', zIndex: '1' });
-
-    const windAngle = Math.atan2(windDirection.x, -windDirection.z) * 180 / Math.PI;
-    const bankingEffect = Math.sin((cube.position.x + cube.position.z) * 0.3) * 5;
-    const speedBanking = (speed - 50) / 10;
-    const totalRotation = windAngle + bankingEffect + speedBanking;
-
-    const scale = 0.6 + (speed / 100) * 0.4;
-    arrow.style.transform = `translate(-50%, -100%) rotate(${totalRotation}deg) scale(${scale})`;
-
-    arrow.userData = { cubeIndex: AppState.windCubes.length, yLevel: cube.position.y / CONSTANTS.GRID.SPACING, cube };
-
-    document.body.appendChild(arrow);
-    return arrow;
   },
 
   regenerate() {
@@ -595,6 +660,11 @@ const WindGenerator = {
 
     if (AppState.selectedFlightLevel !== null && typeof SelectionManager !== 'undefined') {
       SelectionManager.selectFlightLevel(AppState.selectedFlightLevel);
+    }
+
+    // Resample particle velocities from new wind field
+    if (typeof ParticleSystem !== 'undefined') {
+      ParticleSystem.resample();
     }
 
     if (AppState.renderer && AppState.scene && AppState.camera) {
@@ -620,20 +690,21 @@ const SceneManager = {
 
   setupScene() {
     AppState.scene = new THREE.Scene();
+    AppState.scene.fog = new THREE.FogExp2(0x000008, 0.018);
     this.updateBackgroundColor(Config.settings.darkBackground);
   },
 
   setupCamera() {
     const canvas = document.getElementById('three-canvas');
-    const rect = canvas.getBoundingClientRect();
+    const rect   = canvas.getBoundingClientRect();
     AppState.camera = new THREE.PerspectiveCamera(45, rect.width / rect.height, 0.1, 1000);
     AppState.camera.position.set(15, 25, 15);
   },
 
   setupRenderer() {
-    const canvas = document.getElementById('three-canvas');
+    const canvas      = document.getElementById('three-canvas');
     const canvasPanel = document.getElementById('canvas-panel');
-    const rect = canvasPanel.getBoundingClientRect();
+    const rect        = canvasPanel.getBoundingClientRect();
     AppState.renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
     AppState.renderer.setSize(rect.width, rect.height);
     AppState.renderer.setPixelRatio(window.devicePixelRatio);
@@ -641,29 +712,29 @@ const SceneManager = {
 
   setupControls() {
     AppState.controls = new THREE.OrbitControls(AppState.camera, AppState.renderer.domElement);
-    AppState.controls.enableDamping = true;
-    AppState.controls.dampingFactor = 0.05;
-    AppState.controls.enablePan = true;
-    AppState.controls.panSpeed = 1.0;
-    AppState.controls.enableZoom = true;
-    AppState.controls.zoomSpeed = 1.0;
-    AppState.controls.minDistance = 5;
-    AppState.controls.maxDistance = 50;
+    AppState.controls.enableDamping  = true;
+    AppState.controls.dampingFactor  = 0.05;
+    AppState.controls.enablePan      = true;
+    AppState.controls.panSpeed       = 1.0;
+    AppState.controls.enableZoom     = true;
+    AppState.controls.zoomSpeed      = 1.0;
+    AppState.controls.minDistance    = 5;
+    AppState.controls.maxDistance    = 50;
     AppState.controls.target.set(0, 5, 0);
     this.setupPanButtons();
   },
 
   setupPanButtons() {
     const panAmount = 2;
-    document.getElementById('pan-up')?.addEventListener('click', () => this.panCamera(0, panAmount));
-    document.getElementById('pan-down')?.addEventListener('click', () => this.panCamera(0, -panAmount));
-    document.getElementById('pan-left')?.addEventListener('click', () => this.panCamera(panAmount, 0));
+    document.getElementById('pan-up')?.addEventListener('click',    () => this.panCamera(0, panAmount));
+    document.getElementById('pan-down')?.addEventListener('click',  () => this.panCamera(0, -panAmount));
+    document.getElementById('pan-left')?.addEventListener('click',  () => this.panCamera(panAmount, 0));
     document.getElementById('pan-right')?.addEventListener('click', () => this.panCamera(-panAmount, 0));
   },
 
   panCamera(deltaX, deltaY) {
-    const target = AppState.controls.target;
-    const camera = AppState.camera;
+    const target   = AppState.controls.target;
+    const camera   = AppState.camera;
 
     const cameraDirection = new THREE.Vector3();
     camera.getWorldDirection(cameraDirection);
@@ -672,19 +743,32 @@ const SceneManager = {
     cameraRight.crossVectors(camera.up, cameraDirection).normalize();
 
     const cameraUp = new THREE.Vector3(0, 1, 0);
-
-    const offset = new THREE.Vector3();
+    const offset   = new THREE.Vector3();
     offset.addScaledVector(cameraRight, deltaX);
     offset.addScaledVector(cameraUp, deltaY);
 
     target.add(offset);
     camera.position.add(offset);
-
     AppState.controls.update();
   },
 
   setupLighting() {
-    AppState.scene.add(new THREE.AmbientLight(0xffffff, 1.0));
+    // Hemisphere light: near-white sky keeps material colors true, dark ground for contrast
+    const hemiLight = new THREE.HemisphereLight(0xffffff, 0x223322, 0.9);
+    AppState.scene.add(hemiLight);
+    AppState.hemiLight = hemiLight;
+
+    // Primary directional key light: NE quadrant, ~45 degrees elevation
+    const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
+    dirLight.position.set(8, 14, 6);
+    AppState.scene.add(dirLight);
+    AppState.dirLight = dirLight;
+
+    // Soft fill from opposite side to prevent full shadowing
+    const fillLight = new THREE.DirectionalLight(0xffffff, 0.4);
+    fillLight.position.set(-6, 4, -8);
+    AppState.scene.add(fillLight);
+    AppState.fillLight = fillLight;
   },
 
   updateBackgroundColor(isDark) {
@@ -695,40 +779,45 @@ const SceneManager = {
   createGroundPlane() {
     const geometry = new THREE.PlaneGeometry(CONSTANTS.MAP.GROUND_SIZE, CONSTANTS.MAP.GROUND_SIZE);
 
-    AppState.mapCanvas = document.createElement('canvas');
-    AppState.mapCanvas.width = CONSTANTS.MAP.TEXTURE_SIZE;
+    AppState.mapCanvas        = document.createElement('canvas');
+    AppState.mapCanvas.width  = CONSTANTS.MAP.TEXTURE_SIZE;
     AppState.mapCanvas.height = CONSTANTS.MAP.TEXTURE_SIZE;
-    AppState.mapContext = AppState.mapCanvas.getContext('2d');
+    AppState.mapContext       = AppState.mapCanvas.getContext('2d');
 
     AppState.mapContext.fillStyle = '#4a7c59';
     AppState.mapContext.fillRect(0, 0, CONSTANTS.MAP.TEXTURE_SIZE, CONSTANTS.MAP.TEXTURE_SIZE);
 
     AppState.mapTexture = new THREE.CanvasTexture(AppState.mapCanvas);
 
-    const material = new THREE.MeshLambertMaterial({ map: AppState.mapTexture });
-    AppState.groundPlane = new THREE.Mesh(geometry, material);
+    // MeshBasicMaterial ignores scene lighting — map renders at its own true brightness
+    const material = new THREE.MeshBasicMaterial({ map: AppState.mapTexture });
+    AppState.groundPlane            = new THREE.Mesh(geometry, material);
     AppState.groundPlane.rotation.x = -Math.PI / 2;
     AppState.groundPlane.position.y = -1;
     AppState.scene.add(AppState.groundPlane);
   },
 
   createArrowGeometry() {
-    const shaftGeometry = new THREE.CylinderGeometry(0.03, 0.06, 1.0, 8);
-    const headGeometry = new THREE.ConeGeometry(0.12, 0.3, 8);
+    const shaftGeometry = new THREE.CylinderGeometry(0.06, 0.10, 1.0, 8);
+    const headGeometry  = new THREE.ConeGeometry(0.22, 0.45, 8);
 
-    const shaftMatrix = new THREE.Matrix4();
-    const headMatrix = new THREE.Matrix4();
-    headMatrix.setPosition(0, 0.65, 0);
+    // Shaft: bottom at Y=0, top at Y=1.0
+    const shaftMatrix = new THREE.Matrix4().makeTranslation(0, 0.5, 0);
+    // Head: base at Y=1.0, tip at Y=1.3
+    const headMatrix  = new THREE.Matrix4().makeTranslation(0, 1.15, 0);
 
     const shaftGeo = shaftGeometry.clone().applyMatrix4(shaftMatrix);
-    const headGeo = headGeometry.clone().applyMatrix4(headMatrix);
+    const headGeo  = headGeometry.clone().applyMatrix4(headMatrix);
 
     AppState.arrowGeometry = THREE.BufferGeometryUtils.mergeBufferGeometries([shaftGeo, headGeo]);
-    AppState.arrowMaterial = new THREE.MeshLambertMaterial({
-      color: CONSTANTS.COLORS.ARROW,
-      transparent: true,
-      opacity: 0.85
+    // Fully opaque — arrows sit above the cubes so no blending tricks needed
+    AppState.arrowMaterial = new THREE.MeshBasicMaterial({
+      color: CONSTANTS.COLORS.ARROW
     });
+
+    // Clean up intermediate geometries
+    shaftGeometry.dispose();
+    headGeometry.dispose();
   }
 };
 
@@ -742,26 +831,19 @@ const SelectionManager = {
     AppState.selectedFlightLevel = yLevel;
 
     AppState.windCubes.forEach(cube => {
-      if (cube.userData.yLevel === yLevel) {
-        cube.material.opacity = 0.5;
-
-        const wireframeGeometry = new THREE.BoxGeometry(2, 2, 2);
-        const wireframeMaterial = new THREE.MeshBasicMaterial({
-          color: 0xffffff,
-          wireframe: true,
-          transparent: true,
-          opacity: 0.8
-        });
-        const wireframe = new THREE.Mesh(wireframeGeometry, wireframeMaterial);
-        wireframe.position.copy(cube.position);
-        AppState.scene.add(wireframe);
-        AppState.selectedCubes.push(wireframe);
-      } else {
-        cube.material.opacity = Config.settings.cubeOpacity;
-      }
+      cube.material.opacity = cube.userData.yLevel === yLevel
+        ? 0.5
+        : Config.settings.cubeOpacity;
     });
 
-    this.updateArrowVisibility();
+    // Update 3D instanced arrows and heatmap slab
+    if (typeof ArrowSystem !== 'undefined') {
+      ArrowSystem.update(yLevel, AnimationLoop.elapsedTime || 0);
+    }
+    if (typeof SlabSystem !== 'undefined') {
+      SlabSystem.show(yLevel);
+    }
+
     MapManager.addWindCubesToMap();
   },
 
@@ -772,50 +854,31 @@ const SelectionManager = {
 
     AppState.windCubes.forEach(cube => {
       cube.material.opacity = Config.settings.cubeOpacity;
+      cube.visible = true;
     });
 
-    this.updateArrowVisibility();
+    if (typeof ArrowSystem !== 'undefined') {
+      ArrowSystem.update(null, AnimationLoop.elapsedTime || 0);
+    }
+    if (typeof SlabSystem !== 'undefined') {
+      SlabSystem.hide();
+    }
+
     MapManager.addWindCubesToMap();
   },
 
+  // Kept for API compatibility — actual arrow visibility is managed by ArrowSystem
   updateArrowVisibility() {
-    AppState.windArrows.forEach(arrow => {
-      const shouldShow = Config.settings.showWindArrows &&
-        AppState.selectedFlightLevel !== null &&
-        arrow.userData.yLevel === AppState.selectedFlightLevel;
-      arrow.style.display = shouldShow ? 'block' : 'none';
-    });
-
-    if (Config.settings.showWindArrows && AppState.selectedFlightLevel !== null) {
-      this.updateArrowPositions();
+    if (typeof ArrowSystem !== 'undefined') {
+      ArrowSystem.update(AppState.selectedFlightLevel, AnimationLoop.elapsedTime || 0);
     }
-  },
-
-  updateArrowPositions() {
-    AppState.windArrows.forEach(arrow => {
-      if (arrow.style.display === 'block') {
-        const cube = arrow.userData.cube;
-        const screenPosition = Utils.worldToScreen(
-          new THREE.Vector3(cube.position.x, cube.position.y + 1.5, cube.position.z),
-          AppState.camera, AppState.renderer
-        );
-
-        if (screenPosition) {
-          Utils.applyElementStyles(arrow, {
-            left: screenPosition.x + 'px',
-            top: screenPosition.y + 'px',
-            visibility: 'visible'
-          });
-        } else {
-          arrow.style.visibility = 'hidden';
-        }
-      }
-    });
   },
 
   toggleWindArrows(showArrows) {
     Config.settings.showWindArrows = showArrows;
-    this.updateArrowVisibility();
+    if (typeof ArrowSystem !== 'undefined') {
+      ArrowSystem.update(AppState.selectedFlightLevel, AnimationLoop.elapsedTime || 0);
+    }
     MapManager.addWindCubesToMap();
   }
 };
@@ -844,22 +907,22 @@ const LabelsManager = {
   },
 
   createTextSprite(text, x, y, z) {
-    const canvas = document.createElement('canvas');
+    const canvas  = document.createElement('canvas');
     const context = canvas.getContext('2d');
-    canvas.width = 256;
+    canvas.width  = 256;
     canvas.height = 64;
 
     context.fillStyle = 'rgba(0, 0, 0, 0.8)';
     context.fillRect(0, 0, canvas.width, canvas.height);
 
     context.fillStyle = 'white';
-    context.font = '24px Geist, system-ui, sans-serif';
+    context.font      = '24px Ubuntu Mono, monospace';
     context.textAlign = 'center';
     context.fillText(text, canvas.width / 2, 40);
 
-    const texture = new THREE.CanvasTexture(canvas);
+    const texture  = new THREE.CanvasTexture(canvas);
     const material = new THREE.SpriteMaterial({ map: texture });
-    const sprite = new THREE.Sprite(material);
+    const sprite   = new THREE.Sprite(material);
 
     sprite.position.set(x, y, z);
     sprite.scale.set(4, 1, 1);
@@ -874,8 +937,8 @@ const LabelsManager = {
 const MapManager = {
   tileUrls: {
     'OpenStreetMap': 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-    'Satellite': 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-    'Terrain': 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png'
+    'Satellite':     'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+    'Terrain':       'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png'
   },
 
   init() {
@@ -887,13 +950,13 @@ const MapManager = {
   initLeaflet() {
     const mapDiv = document.getElementById('leaflet-map-main');
     AppState.leafletMap = L.map(mapDiv, {
-      zoomControl: true,
+      zoomControl:       true,
       attributionControl: true,
-      dragging: true,
-      touchZoom: true,
-      scrollWheelZoom: true,
-      doubleClickZoom: true,
-      boxZoom: true
+      dragging:          true,
+      touchZoom:         true,
+      scrollWheelZoom:   true,
+      doubleClickZoom:   true,
+      boxZoom:           true
     });
 
     L.tileLayer(this.tileUrls[Config.settings.mapStyle], { maxZoom: 19 }).addTo(AppState.leafletMap);
@@ -910,10 +973,10 @@ const MapManager = {
 
     const bounds = L.latLngBounds(stateData.bounds);
     AppState.windDataBounds = L.rectangle(bounds, {
-      color: '#000000',
-      weight: 3,
+      color:       '#000000',
+      weight:      3,
       fillOpacity: 0.1,
-      fillColor: '#00ddff'
+      fillColor:   '#00ddff'
     }).addTo(AppState.leafletMap);
 
     this.captureTexture();
@@ -940,7 +1003,7 @@ const MapManager = {
     const stateData = getStateData(Config.settings.state);
     if (!stateData) return;
 
-    const zoom = Math.max(stateData.zoom - 1, 3);
+    const zoom   = Math.max(stateData.zoom - 1, 3);
     const bounds = stateData.bounds;
 
     const nwTile = this.latLngToTile(bounds[1][0], bounds[0][1], zoom);
@@ -949,11 +1012,11 @@ const MapManager = {
     const tilesX = Math.abs(seTile.x - nwTile.x) + 1;
     const tilesY = Math.abs(seTile.y - nwTile.y) + 1;
 
-    const tileCanvas = document.createElement('canvas');
-    const tileSize = 256;
-    tileCanvas.width = tilesX * tileSize;
+    const tileCanvas  = document.createElement('canvas');
+    const tileSize    = 256;
+    tileCanvas.width  = tilesX * tileSize;
     tileCanvas.height = tilesY * tileSize;
-    const tileCtx = tileCanvas.getContext('2d');
+    const tileCtx     = tileCanvas.getContext('2d');
 
     let tilesLoaded = 0;
     const totalTiles = tilesX * tilesY;
@@ -969,8 +1032,8 @@ const MapManager = {
           .replace('{y}', tileY)
           .replace('{s}', 'a');
 
-        const img = new Image();
-        img.crossOrigin = 'anonymous';
+        const img        = new Image();
+        img.crossOrigin  = 'anonymous';
 
         img.onload = () => {
           tileCtx.drawImage(img, x * tileSize, y * tileSize, tileSize, tileSize);
@@ -982,9 +1045,7 @@ const MapManager = {
 
         img.onerror = () => {
           tilesLoaded++;
-          if (tilesLoaded === totalTiles) {
-            this.createFallbackTexture();
-          }
+          if (tilesLoaded === totalTiles) this.createFallbackTexture();
         };
 
         img.src = tileUrl;
@@ -995,15 +1056,14 @@ const MapManager = {
   finalizeBoundsTexture(tileCanvas, bounds, zoom) {
     AppState.mapContext.clearRect(0, 0, CONSTANTS.MAP.TEXTURE_SIZE, CONSTANTS.MAP.TEXTURE_SIZE);
 
-    const nwTile = this.latLngToTile(bounds[1][0], bounds[0][1], zoom);
-    const seTile = this.latLngToTile(bounds[0][0], bounds[1][1], zoom);
-
+    const nwTile  = this.latLngToTile(bounds[1][0], bounds[0][1], zoom);
+    const seTile  = this.latLngToTile(bounds[0][0], bounds[1][1], zoom);
     const nwPixel = this.latLngToPixel(bounds[1][0], bounds[0][1], zoom);
     const sePixel = this.latLngToPixel(bounds[0][0], bounds[1][1], zoom);
 
     const cropX = nwPixel.x - (Math.min(nwTile.x, seTile.x) * 256);
     const cropY = nwPixel.y - (Math.min(nwTile.y, seTile.y) * 256);
-    const cropWidth = sePixel.x - nwPixel.x;
+    const cropWidth  = sePixel.x - nwPixel.x;
     const cropHeight = sePixel.y - nwPixel.y;
 
     AppState.mapContext.drawImage(
@@ -1038,7 +1098,7 @@ const MapManager = {
 
   addGridPattern() {
     AppState.mapContext.strokeStyle = '#3a5a2a';
-    AppState.mapContext.lineWidth = 1;
+    AppState.mapContext.lineWidth   = 1;
     for (let i = 0; i < CONSTANTS.MAP.TEXTURE_SIZE; i += 64) {
       AppState.mapContext.beginPath();
       AppState.mapContext.moveTo(i, 0);
@@ -1055,7 +1115,7 @@ const MapManager = {
     AppState.mapContext.fillStyle = 'rgba(0, 0, 0, 0.7)';
     AppState.mapContext.fillRect(10, 10, 150, 30);
     AppState.mapContext.fillStyle = 'white';
-    AppState.mapContext.font = '16px Arial';
+    AppState.mapContext.font      = '16px Arial';
     AppState.mapContext.fillText(Config.settings.state, 20, 30);
   },
 
@@ -1067,31 +1127,35 @@ const MapManager = {
     }
 
     if (AppState.groundPlane) {
-      AppState.groundPlane.material.map = AppState.mapTexture;
+      AppState.groundPlane.material.map       = AppState.mapTexture;
       AppState.groundPlane.material.needsUpdate = true;
     }
   },
 
-  addWindCubesToMap(flightLevel = null) {
+  addWindCubesToMap(flightLevel) {
     if (AppState.windMapMarkers) {
       AppState.windMapMarkers.forEach(marker => AppState.leafletMap.removeLayer(marker));
     }
     AppState.windMapMarkers = [];
 
     if (flightLevel === null && AppState.selectedFlightLevel === null) return;
+    if (flightLevel === undefined && AppState.selectedFlightLevel === null) return;
 
-    const targetLevel = flightLevel !== null ? flightLevel : AppState.selectedFlightLevel;
+    const targetLevel = (flightLevel !== null && flightLevel !== undefined)
+      ? flightLevel
+      : AppState.selectedFlightLevel;
+
     const stateData = getStateData(Config.settings.state);
     if (!stateData) return;
 
-    const bounds = stateData.bounds;
+    const bounds       = stateData.bounds;
     const latLngBounds = L.latLngBounds(bounds);
-    const latRange = latLngBounds.getNorth() - latLngBounds.getSouth();
-    const lngRange = latLngBounds.getEast() - latLngBounds.getWest();
+    const latRange     = latLngBounds.getNorth() - latLngBounds.getSouth();
+    const lngRange     = latLngBounds.getEast()  - latLngBounds.getWest();
 
     const gridSize = CONSTANTS.GRID.RANGE * 2 / CONSTANTS.GRID.SPACING + 1;
-    const cellLat = latRange / gridSize;
-    const cellLng = lngRange / gridSize;
+    const cellLat  = latRange / gridSize;
+    const cellLng  = lngRange / gridSize;
 
     AppState.windCubes.forEach(cube => {
       if (cube.userData.yLevel === targetLevel) {
@@ -1110,17 +1174,17 @@ const MapManager = {
         ];
 
         const rectangle = L.rectangle(cellBounds, {
-          color: color,
-          weight: 0,
-          fillColor: color,
+          color:       color,
+          weight:      0,
+          fillColor:   color,
           fillOpacity: 0.4,
-          className: 'wind-cube-cell'
+          className:   'wind-cube-cell'
         });
 
-        rectangle.bindTooltip(`FL${String(cube.userData.flightLevel).padStart(3, '0')}<br/>Wind: ${speed} kt`, {
-          permanent: false,
-          direction: 'top'
-        });
+        rectangle.bindTooltip(
+          `FL${String(cube.userData.flightLevel).padStart(3, '0')}<br/>Wind: ${speed} kt`,
+          { permanent: false, direction: 'top' }
+        );
 
         rectangle.addTo(AppState.leafletMap);
         AppState.windMapMarkers.push(rectangle);
@@ -1133,16 +1197,15 @@ const MapManager = {
             icon: L.divIcon({
               className: 'wind-arrow-map',
               html: `<div style="
-                width: 0;
-                height: 0;
+                width: 0; height: 0;
                 border-left: 4px solid transparent;
                 border-right: 4px solid transparent;
                 border-bottom: 12px solid #00ddff;
                 transform: rotate(${windAngle}deg);
                 transform-origin: center bottom;
-                filter: drop-shadow(0 0 2px rgba(0, 0, 0, 0.8));
+                filter: drop-shadow(0 0 2px rgba(0,0,0,0.8));
               "></div>`,
-              iconSize: [8, 12],
+              iconSize:   [8, 12],
               iconAnchor: [4, 6]
             })
           });
@@ -1187,14 +1250,14 @@ const MapManager = {
       return '#' + threeColor.getHexString();
     } else if (typeof threeColor === 'number') {
       return '#' + threeColor.toString(16).padStart(6, '0');
-    } else {
-      const { THRESHOLDS } = CONSTANTS.WIND_SPEED;
-      if (speed < THRESHOLDS[0]) return '#00AA00';
-      if (speed < THRESHOLDS[1]) return '#66FF66';
-      if (speed < THRESHOLDS[2]) return '#FFFF00';
-      if (speed < THRESHOLDS[3]) return '#FF8800';
-      return '#FF0000';
     }
+
+    const { THRESHOLDS } = CONSTANTS.WIND_SPEED;
+    if (speed < THRESHOLDS[0]) return '#0d7a54';
+    if (speed < THRESHOLDS[1]) return '#1db87e';
+    if (speed < THRESHOLDS[2]) return '#c8a800';
+    if (speed < THRESHOLDS[3]) return '#e05c00';
+    return '#cc0020';
   }
 };
 
@@ -1203,7 +1266,8 @@ const MapManager = {
 // =============================================================================
 
 const AnimationLoop = {
-  frameCount: 0,
+  elapsedTime: 0,
+  lastTime:    0,
 
   start() {
     this.animate();
@@ -1212,25 +1276,29 @@ const AnimationLoop = {
   animate() {
     requestAnimationFrame(this.animate.bind(this));
 
-    AppState.controls.update();
-    this.updateCubeOpacity();
+    const now = performance.now() * 0.001; // seconds
+    this.lastTime    = this.lastTime || now;
+    const dt         = Math.min(now - this.lastTime, 0.1);
+    this.lastTime    = now;
+    this.elapsedTime = now;
 
-    this.frameCount++;
-    if (Config.settings.showWindArrows && AppState.selectedFlightLevel !== null && this.frameCount % 3 === 0) {
-      SelectionManager.updateArrowPositions();
+    AppState.controls.update();
+
+    // Flow particles — every frame
+    if (typeof ParticleSystem !== 'undefined') {
+      ParticleSystem.update();
+    }
+
+    // Storm particles — every frame when active
+    if (typeof StormSystem !== 'undefined') {
+      StormSystem.update(this.elapsedTime);
+    }
+
+    // Animated instanced arrows — only when visible
+    if (AppState.arrowInstancedMesh?.visible && typeof ArrowSystem !== 'undefined') {
+      ArrowSystem.update(AppState.selectedFlightLevel, this.elapsedTime);
     }
 
     AppState.renderer.render(AppState.scene, AppState.camera);
-  },
-
-  updateCubeOpacity() {
-    if (!AppState.isHovering && AppState.selectedFlightLevel === null) {
-      const cameraPosition = AppState.camera.position;
-      AppState.windCubes.forEach(cube => {
-        const distance = cameraPosition.distanceTo(cube.position);
-        const opacity = Math.max(0.02, Math.min(Config.settings.cubeOpacity, (80 - distance) / 80));
-        cube.material.opacity = opacity;
-      });
-    }
   }
 };
