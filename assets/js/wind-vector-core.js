@@ -706,7 +706,7 @@ const SceneManager = {
     const canvas = document.getElementById('three-canvas');
     const rect   = canvas.getBoundingClientRect();
     AppState.camera = new THREE.PerspectiveCamera(45, rect.width / rect.height, 0.1, 1000);
-    AppState.camera.position.set(15, 25, 15);
+    AppState.camera.position.set(18, 14, 18);
   },
 
   setupRenderer() {
