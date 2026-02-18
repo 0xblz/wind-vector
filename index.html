@@ -67,13 +67,19 @@ layout: default
         </div>
         <div class="gui-control">
             <div class="gui-control-row">
+            <label for="gui-cube-opacity">Cube Opacity</label>
+            <span class="gui-control-value" id="gui-cube-opacity-value">0.10</span>
+            </div>
+            <input type="range" id="gui-cube-opacity" min="0.01" max="0.3" step="0.01" value="0.1">
+        </div>
+        <div class="gui-control">
+            <div class="gui-control-row">
             <label for="gui-hurricane-intensity">Hurricane Category</label>
             <span class="gui-control-value" id="gui-hurricane-intensity-value">1</span>
             </div>
             <input type="range" id="gui-hurricane-intensity" min="1" max="5" step="1" value="1">
         </div>
-        <button class="gui-button" id="gui-randomize-wind">Randomize Wind</button>
-        </div>
+</div>
     </div>
 
     <div class="gui-section">
@@ -99,24 +105,17 @@ layout: default
     </div>
 
     <div class="gui-section">
-        <h3 class="gui-section-title"><i class="fa-solid fa-gear"></i> Options</h3>
+        <h3 class="gui-section-title"><i class="fa-solid fa-wind"></i> Wind</h3>
         <div class="gui-controls">
-        <div class="gui-checkbox">
-            <input type="checkbox" id="gui-dark-background">
-            <label for="gui-dark-background">Dark Background</label>
-        </div>
         <div class="gui-checkbox">
             <input type="checkbox" id="gui-wind-arrows" checked>
             <label for="gui-wind-arrows">Wind Direction</label>
         </div>
-        <div class="gui-control">
-            <div class="gui-control-row">
-            <label for="gui-cube-opacity">Cube Opacity</label>
-            <span class="gui-control-value" id="gui-cube-opacity-value">0.10</span>
-            </div>
-            <input type="range" id="gui-cube-opacity" min="0.01" max="0.3" step="0.01" value="0.1">
+        <div class="gui-checkbox">
+            <input type="checkbox" id="gui-wind-particles" checked>
+            <label for="gui-wind-particles">Wind Particles</label>
         </div>
-        <div class="gui-control">
+        <div class="gui-control" id="gui-particle-opacity-control">
             <div class="gui-control-row">
             <label for="gui-particle-opacity">Particle Brightness</label>
             <span class="gui-control-value" id="gui-particle-opacity-value">0.85</span>

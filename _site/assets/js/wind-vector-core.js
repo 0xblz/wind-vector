@@ -71,6 +71,7 @@ const Config = {
     mapStyle:             'Terrain',
     darkBackground:       true,
     showWindArrows:       true,
+    showWindParticles:    true,
     currentDate:          'Oct 15, 2024',
     currentTime:          '14:00',
     thunderstormActive:   false,
@@ -105,8 +106,9 @@ const AppState = {
   stormParticleSystem: null,
   stormParticleData:   null,
 
-  // Wind field lookup (populated after generateGrid)
-  windFieldMap: null,
+  // Wind field lookups (populated after generateGrid)
+  windFieldMap:  null,
+  windSpeedMap:  null,
 
   // Shared materials
   sharedMaterials:         [],
@@ -616,11 +618,13 @@ const WindGenerator = {
       }
     }
 
-    // Build O(1) wind direction lookup map
+    // Build O(1) wind field lookup maps
     AppState.windFieldMap = new Map();
+    AppState.windSpeedMap = new Map();
     AppState.windCubes.forEach(cube => {
       const key = `${cube.position.x},${cube.position.y},${cube.position.z}`;
       AppState.windFieldMap.set(key, cube.userData.windDirection);
+      AppState.windSpeedMap.set(key, cube.userData.speed);
     });
   },
 
@@ -691,7 +695,7 @@ const SceneManager = {
   setupScene() {
     AppState.scene = new THREE.Scene();
     AppState.scene.fog = new THREE.FogExp2(0x000008, 0.018);
-    this.updateBackgroundColor(Config.settings.darkBackground);
+    AppState.scene.background = new THREE.Color(CONSTANTS.COLORS.BACKGROUND.DARK);
   },
 
   setupCamera() {
@@ -880,6 +884,13 @@ const SelectionManager = {
       ArrowSystem.update(AppState.selectedFlightLevel, AnimationLoop.elapsedTime || 0);
     }
     MapManager.addWindCubesToMap();
+  },
+
+  toggleWindParticles(show) {
+    Config.settings.showWindParticles = show;
+    if (AppState.particleSystem) {
+      AppState.particleSystem.visible = show;
+    }
   }
 };
 

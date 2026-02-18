@@ -57,12 +57,11 @@ const UIManager = {
   setupGUI() {
     this.setupStateSelect();
     this.setupMapStyleSelect();
-    this.setupDarkBackgroundToggle();
+this.setupWindParticlesToggle();
     this.setupWindArrowsToggle();
     this.setupCubeOpacitySlider();
     this.setupParticleOpacitySlider();
     this.setupStormControls();
-    this.setupRandomizeButton();
     TimeControls.setupControls();
   },
 
@@ -92,14 +91,15 @@ const UIManager = {
     });
   },
 
-  setupDarkBackgroundToggle() {
-    const darkBgCheckbox = document.getElementById('gui-dark-background');
-    if (!darkBgCheckbox) return;
+  setupWindParticlesToggle() {
+    const checkbox       = document.getElementById('gui-wind-particles');
+    const brightnessCtrl = document.getElementById('gui-particle-opacity-control');
+    if (!checkbox) return;
 
-    darkBgCheckbox.checked = Config.settings.darkBackground;
-    darkBgCheckbox.addEventListener('change', (e) => {
-      Config.settings.darkBackground = e.target.checked;
-      SceneManager.updateBackgroundColor(e.target.checked);
+    checkbox.checked = Config.settings.showWindParticles;
+    checkbox.addEventListener('change', (e) => {
+      SelectionManager.toggleWindParticles(e.target.checked);
+      if (brightnessCtrl) brightnessCtrl.style.display = e.target.checked ? '' : 'none';
     });
   },
 
@@ -181,13 +181,6 @@ const UIManager = {
     }
   },
 
-  setupRandomizeButton() {
-    const randomizeButton = document.getElementById('gui-randomize-wind');
-    if (!randomizeButton) return;
-
-    randomizeButton.addEventListener('click', () => this.randomizeWind());
-  },
-
   onStormToggle(stormType, isActive) {
     const positionKey = stormType === 'hurricane' ? 'hurricanePosition' : 'thunderstormPosition';
 
@@ -209,39 +202,6 @@ const UIManager = {
     }
   },
 
-  randomizeWind() {
-    if (Config.settings.thunderstormActive) {
-      Config.settings.thunderstormPosition = Utils.getRandomPosition();
-    }
-
-    if (Config.settings.hurricaneActive) {
-      Config.settings.hurricanePosition = Utils.getRandomPosition();
-    }
-
-    const randomHourOffset = Math.floor(Math.random() * 24);
-    const randomDayOffset  = Math.floor(Math.random() * 30);
-
-    const originalTime = { ...AppState.currentTime };
-    const originalDate = new Date(AppState.currentDate);
-
-    AppState.currentTime.hour = (AppState.currentTime.hour + randomHourOffset) % 24;
-    AppState.currentDate.setDate(AppState.currentDate.getDate() + randomDayOffset);
-
-    WindGenerator.regenerate();
-
-    AppState.currentTime = originalTime;
-    AppState.currentDate = originalDate;
-    TimeControls.updateDisplay();
-
-    // Rebuild storm particles at new position if active
-    if (Config.settings.hurricaneActive) {
-      StormSystem.dispose();
-      StormSystem.build('hurricane');
-    } else if (Config.settings.thunderstormActive) {
-      StormSystem.dispose();
-      StormSystem.build('thunderstorm');
-    }
-  }
 };
 
 // =============================================================================

@@ -183,17 +183,19 @@ const ArrowSystem = {
 
 // =============================================================================
 // PARTICLE SYSTEM
-// 2000 THREE.Points flowing along the wind field.
+// 2000 wind-line streaks flowing along the wind field.
+// Each particle is a LineSegment: head at current position, tail trailing
+// behind in the opposite of the velocity direction.
 // Wind direction sampled via O(1) Map lookup after grid generation.
 // =============================================================================
 
 const ParticleSystem = {
   OPTIONS: {
-    COUNT:        2000,
-    SPEED_SCALE:  0.015,
+    COUNT:        100,
+    SPEED_SCALE:  0.05,
     LIFETIME_MIN: 80,
     LIFETIME_MAX: 240,
-    SIZE:         0.10,
+    LINE_LENGTH:  2.5,
     OPACITY:      0.85
   },
 
@@ -209,48 +211,56 @@ const ParticleSystem = {
   build() {
     this.dispose();
 
-    const count = this.OPTIONS.COUNT;
-    const positions  = new Float32Array(count * 3);
-    const velocities = new Float32Array(count * 3);
-    const lifetimes  = new Float32Array(count);
-    const maxLife    = new Float32Array(count);
+    const count        = this.OPTIONS.COUNT;
+    // Two vertices per line segment (head + tail), 3 floats each
+    const linePositions = new Float32Array(count * 2 * 3);
+    const particlePos   = new Float32Array(count * 3);
+    const velocities    = new Float32Array(count * 3);
+    const lifetimes     = new Float32Array(count);
+    const maxLife       = new Float32Array(count);
 
     for (let i = 0; i < count; i++) {
-      this._resetParticle(positions, velocities, lifetimes, maxLife, i, true);
+      this._resetParticle(particlePos, velocities, lifetimes, maxLife, i, true);
+      // Init both vertices to the same spawn position
+      linePositions[i * 6    ] = particlePos[i * 3    ];
+      linePositions[i * 6 + 1] = particlePos[i * 3 + 1];
+      linePositions[i * 6 + 2] = particlePos[i * 3 + 2];
+      linePositions[i * 6 + 3] = particlePos[i * 3    ];
+      linePositions[i * 6 + 4] = particlePos[i * 3 + 1];
+      linePositions[i * 6 + 5] = particlePos[i * 3 + 2];
     }
 
     const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    geometry.setAttribute('position', new THREE.BufferAttribute(linePositions, 3));
 
-    const material = new THREE.PointsMaterial({
-      color: CONSTANTS.COLORS.ARROW,
-      size:  this.OPTIONS.SIZE,
+    const material = new THREE.LineBasicMaterial({
+      color:       CONSTANTS.COLORS.ARROW,
       transparent: true,
-      opacity: this.OPTIONS.OPACITY,
-      sizeAttenuation: true,
-      depthWrite: false,
-      blending: THREE.AdditiveBlending
+      opacity:     this.OPTIONS.OPACITY,
+      depthWrite:  false,
+      depthTest:   false
     });
 
-    const points = new THREE.Points(geometry, material);
-    points.frustumCulled = false;
-    AppState.scene.add(points);
-    AppState.particleSystem = points;
-    AppState.particleData   = { positions, velocities, lifetimes, maxLife };
+    const lines = new THREE.LineSegments(geometry, material);
+    lines.frustumCulled  = false;
+    lines.renderOrder    = 1;
+    AppState.scene.add(lines);
+    AppState.particleSystem = lines;
+    AppState.particleData   = { linePositions, particlePos, velocities, lifetimes, maxLife };
   },
 
-  _resetParticle(positions, velocities, lifetimes, maxLife, i, randomLifetime) {
+  _resetParticle(particlePos, velocities, lifetimes, maxLife, i, randomLifetime) {
     const B  = this.GRID_BOUNDS;
     const px = B.xMin + Math.random() * (B.xMax - B.xMin);
     const py = B.yMin + Math.random() * (B.yMax - B.yMin);
     const pz = B.zMin + Math.random() * (B.zMax - B.zMin);
 
-    positions[i * 3    ] = px;
-    positions[i * 3 + 1] = py;
-    positions[i * 3 + 2] = pz;
+    particlePos[i * 3    ] = px;
+    particlePos[i * 3 + 1] = py;
+    particlePos[i * 3 + 2] = pz;
 
-    const dir   = this._sampleWindDirection(px, py, pz);
-    const speed = this.OPTIONS.SPEED_SCALE;
+    const dir       = this._sampleWindDirection(px, py, pz);
+    const speed     = this._scaledSpeed(px, py, pz);
     velocities[i * 3    ] = dir.x * speed;
     velocities[i * 3 + 1] = 0;
     velocities[i * 3 + 2] = dir.z * speed;
@@ -263,7 +273,17 @@ const ParticleSystem = {
 
   _sampleWindDirection(px, py, pz) {
     if (!AppState.windFieldMap) return new THREE.Vector3(1, 0, 0);
+    const [cx, cy, cz] = this._gridCell(px, py, pz);
+    return AppState.windFieldMap.get(`${cx},${cy},${cz}`) || new THREE.Vector3(1, 0, 0);
+  },
 
+  _sampleWindSpeed(px, py, pz) {
+    if (!AppState.windSpeedMap) return CONSTANTS.WIND_SPEED.MIN;
+    const [cx, cy, cz] = this._gridCell(px, py, pz);
+    return AppState.windSpeedMap.get(`${cx},${cy},${cz}`) || CONSTANTS.WIND_SPEED.MIN;
+  },
+
+  _gridCell(px, py, pz) {
     const spacing = CONSTANTS.GRID.SPACING;
     const range   = CONSTANTS.GRID.RANGE;
     const cx = Math.max(-range, Math.min(range, Math.round(px / spacing) * spacing));
@@ -272,30 +292,64 @@ const ParticleSystem = {
       Math.round(py / spacing) * spacing
     ));
     const cz = Math.max(-range, Math.min(range, Math.round(pz / spacing) * spacing));
+    return [cx, cy, cz];
+  },
 
-    return AppState.windFieldMap.get(`${cx},${cy},${cz}`) || new THREE.Vector3(1, 0, 0);
+  _scaledSpeed(px, py, pz) {
+    const ws  = this._sampleWindSpeed(px, py, pz);
+    const t   = Math.max(0, Math.min(1,
+      (ws - CONSTANTS.WIND_SPEED.MIN) / (CONSTANTS.WIND_SPEED.MAX - CONSTANTS.WIND_SPEED.MIN)
+    ));
+    return this.OPTIONS.SPEED_SCALE * (0.4 + t * 2.6);
   },
 
   update() {
     if (!AppState.particleSystem || !AppState.particleData) return;
 
-    const { positions, velocities, lifetimes, maxLife } = AppState.particleData;
-    const count = this.OPTIONS.COUNT;
-    const B     = this.GRID_BOUNDS;
+    const { linePositions, particlePos, velocities, lifetimes, maxLife } = AppState.particleData;
+    const count   = this.OPTIONS.COUNT;
+    const B       = this.GRID_BOUNDS;
+    const linelen = this.OPTIONS.LINE_LENGTH;
 
     for (let i = 0; i < count; i++) {
-      positions[i * 3    ] += velocities[i * 3    ];
-      positions[i * 3 + 1] += velocities[i * 3 + 1];
-      positions[i * 3 + 2] += velocities[i * 3 + 2];
+      const vx = velocities[i * 3    ];
+      const vy = velocities[i * 3 + 1];
+      const vz = velocities[i * 3 + 2];
+
+      particlePos[i * 3    ] += vx;
+      particlePos[i * 3 + 1] += vy;
+      particlePos[i * 3 + 2] += vz;
       lifetimes[i] -= 1;
 
-      const x = positions[i * 3], y = positions[i * 3 + 1], z = positions[i * 3 + 2];
+      const px = particlePos[i * 3    ];
+      const py = particlePos[i * 3 + 1];
+      const pz = particlePos[i * 3 + 2];
+
       if (lifetimes[i] <= 0 ||
-          x < B.xMin || x > B.xMax ||
-          y < B.yMin || y > B.yMax ||
-          z < B.zMin || z > B.zMax) {
-        this._resetParticle(positions, velocities, lifetimes, maxLife, i, false);
+          px < B.xMin || px > B.xMax ||
+          py < B.yMin || py > B.yMax ||
+          pz < B.zMin || pz > B.zMax) {
+        this._resetParticle(particlePos, velocities, lifetimes, maxLife, i, false);
+        // Collapse line to a point at spawn so no flash
+        linePositions[i * 6    ] = particlePos[i * 3    ];
+        linePositions[i * 6 + 1] = particlePos[i * 3 + 1];
+        linePositions[i * 6 + 2] = particlePos[i * 3 + 2];
+        linePositions[i * 6 + 3] = particlePos[i * 3    ];
+        linePositions[i * 6 + 4] = particlePos[i * 3 + 1];
+        linePositions[i * 6 + 5] = particlePos[i * 3 + 2];
+        continue;
       }
+
+      // Head at current position
+      linePositions[i * 6    ] = px;
+      linePositions[i * 6 + 1] = py;
+      linePositions[i * 6 + 2] = pz;
+
+      // Tail trails behind: head - normalised_velocity * LINE_LENGTH
+      const vLen = Math.sqrt(vx * vx + vz * vz) || 1;
+      linePositions[i * 6 + 3] = px - (vx / vLen) * linelen;
+      linePositions[i * 6 + 4] = py;
+      linePositions[i * 6 + 5] = pz - (vz / vLen) * linelen;
     }
 
     AppState.particleSystem.geometry.attributes.position.needsUpdate = true;
@@ -309,13 +363,12 @@ const ParticleSystem = {
 
   resample() {
     if (!AppState.particleData) return;
-    const { positions, velocities } = AppState.particleData;
+    const { particlePos, velocities } = AppState.particleData;
     const count = this.OPTIONS.COUNT;
     for (let i = 0; i < count; i++) {
-      const dir   = this._sampleWindDirection(
-        positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2]
-      );
-      const speed = this.OPTIONS.SPEED_SCALE;
+      const px = particlePos[i * 3], py = particlePos[i * 3 + 1], pz = particlePos[i * 3 + 2];
+      const dir   = this._sampleWindDirection(px, py, pz);
+      const speed = this._scaledSpeed(px, py, pz);
       velocities[i * 3    ] = dir.x * speed;
       velocities[i * 3 + 1] = 0;
       velocities[i * 3 + 2] = dir.z * speed;
@@ -472,15 +525,15 @@ const SlabSystem = {
 
 const StormSystem = {
   OPTIONS: {
-    HURRICANE_PARTICLES:    600,
-    THUNDERSTORM_PARTICLES: 400,
+    HURRICANE_PARTICLES:      600,
+    THUNDERSTORM_PARTICLES:   400,
     HURRICANE_ROTATION_SPEED: 0.008,
     THUNDERSTORM_RISE_SPEED:  0.04,
-    PARTICLE_SIZE: 0.12
+    LINE_LENGTH:              0.6
   },
 
-  _type:   null,
-  _light:  null,
+  _type:         null,
+  _light:        null,
   _lightFlicker: 0,
 
   build(type) {
@@ -492,11 +545,11 @@ const StormSystem = {
   },
 
   _buildHurricane() {
-    const count = this.OPTIONS.HURRICANE_PARTICLES;
-    const positions = new Float32Array(count * 3);
-    const angles    = new Float32Array(count);
-    const radii     = new Float32Array(count);
-    const speeds    = new Float32Array(count);
+    const count         = this.OPTIONS.HURRICANE_PARTICLES;
+    const linePositions = new Float32Array(count * 2 * 3);
+    const angles        = new Float32Array(count);
+    const radii         = new Float32Array(count);
+    const speeds        = new Float32Array(count);
 
     const pos = Config.settings.hurricanePosition;
     const { EYE_BASE_RADIUS, EYE_RADIUS_SCALE, SPIRAL_BASE_RADIUS, SPIRAL_RADIUS_SCALE } =
@@ -515,68 +568,70 @@ const StormSystem = {
       speeds[i] = 0.7 + Math.random() * 0.6;
 
       const yPos = Math.random() * maxY;
-      positions[i * 3    ] = pos.x + Math.cos(angles[i]) * radii[i];
-      positions[i * 3 + 1] = yPos;
-      positions[i * 3 + 2] = pos.z + Math.sin(angles[i]) * radii[i];
+      const hx   = pos.x + Math.cos(angles[i]) * radii[i];
+      const hz   = pos.z + Math.sin(angles[i]) * radii[i];
+
+      linePositions[i * 6    ] = hx;   linePositions[i * 6 + 1] = yPos; linePositions[i * 6 + 2] = hz;
+      linePositions[i * 6 + 3] = hx;   linePositions[i * 6 + 4] = yPos; linePositions[i * 6 + 5] = hz;
     }
 
-    this._finalize(positions, { angles, radii, speeds }, 0xff00ff);
+    this._finalize(linePositions, { angles, radii, speeds }, 0xff00ff);
 
-    // Magenta point light at hurricane center
     this._light = new THREE.PointLight(0xff00aa, 4, 14);
     this._light.position.set(pos.x, 5, pos.z);
     AppState.scene.add(this._light);
   },
 
   _buildThunderstorm() {
-    const count = this.OPTIONS.THUNDERSTORM_PARTICLES;
-    const positions = new Float32Array(count * 3);
-    const altitudes = new Float32Array(count);
+    const count         = this.OPTIONS.THUNDERSTORM_PARTICLES;
+    const linePositions = new Float32Array(count * 2 * 3);
+    const altitudes     = new Float32Array(count);
 
-    const pos          = Config.settings.thunderstormPosition;
-    const COLUMN_R     = 1.5;
-    const maxY         = CONSTANTS.FLIGHT_LEVELS.COUNT * CONSTANTS.GRID.SPACING;
+    const pos      = Config.settings.thunderstormPosition;
+    const COLUMN_R = 1.5;
+    const maxY     = CONSTANTS.FLIGHT_LEVELS.COUNT * CONSTANTS.GRID.SPACING;
+    const LINE_LEN = this.OPTIONS.LINE_LENGTH;
 
     for (let i = 0; i < count; i++) {
       const angle = Math.random() * Math.PI * 2;
       const r     = Math.random() * COLUMN_R;
       const y     = Math.random() * maxY;
+      const px    = pos.x + Math.cos(angle) * r;
+      const pz    = pos.z + Math.sin(angle) * r;
 
-      positions[i * 3    ] = pos.x + Math.cos(angle) * r;
-      positions[i * 3 + 1] = y;
-      positions[i * 3 + 2] = pos.z + Math.sin(angle) * r;
-      altitudes[i]          = y;
+      linePositions[i * 6    ] = px;  linePositions[i * 6 + 1] = y;           linePositions[i * 6 + 2] = pz;
+      linePositions[i * 6 + 3] = px;  linePositions[i * 6 + 4] = y - LINE_LEN; linePositions[i * 6 + 5] = pz;
+      altitudes[i] = y;
     }
 
-    this._finalize(positions, { altitudes }, 0xffaa00);
+    this._finalize(linePositions, { altitudes }, 0xffaa00);
 
-    // Flickering point light at storm column
     this._light = new THREE.PointLight(0x4488ff, 2, 10);
     this._light.position.set(pos.x, 10, pos.z);
     AppState.scene.add(this._light);
     this._lightFlicker = 0;
   },
 
-  _finalize(positions, extra, color) {
+  _finalize(linePositions, extra, color) {
     const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    geometry.setAttribute('position', new THREE.BufferAttribute(linePositions, 3));
 
-    const material = new THREE.PointsMaterial({
+    const material = new THREE.LineBasicMaterial({
       color,
-      size:            this.OPTIONS.PARTICLE_SIZE,
-      transparent:     true,
-      opacity:         0.7,
-      blending:        THREE.AdditiveBlending,
-      depthWrite:      false,
-      sizeAttenuation: true
+      transparent: true,
+      opacity:     0.7,
+      blending:    THREE.AdditiveBlending,
+      depthWrite:  false,
+      depthTest:   false
     });
 
-    const points = new THREE.Points(geometry, material);
-    points.frustumCulled = false;
-    AppState.scene.add(points);
+    const lines = new THREE.LineSegments(geometry, material);
+    lines.frustumCulled = false;
+    lines.renderOrder   = 1;
+    AppState.scene.add(lines);
 
-    AppState.stormParticleSystem = points;
-    AppState.stormParticleData   = { positions, ...extra };
+    AppState.stormParticleSystem = lines;
+    AppState.stormParticleData   = { linePositions, ...extra };
   },
 
   update(time) {
@@ -589,37 +644,58 @@ const StormSystem = {
   },
 
   _updateHurricane(time) {
-    const { positions, angles, radii, speeds } = AppState.stormParticleData;
+    const { linePositions, angles, radii, speeds } = AppState.stormParticleData;
     const pos      = Config.settings.hurricanePosition;
     const rotSpeed = this.OPTIONS.HURRICANE_ROTATION_SPEED;
     const count    = this.OPTIONS.HURRICANE_PARTICLES;
+    const LINE_LEN = this.OPTIONS.LINE_LENGTH;
 
     for (let i = 0; i < count; i++) {
       angles[i] += rotSpeed * speeds[i];
-      positions[i * 3    ] = pos.x + Math.cos(angles[i]) * radii[i];
-      positions[i * 3 + 2] = pos.z + Math.sin(angles[i]) * radii[i];
-      positions[i * 3 + 1] += Math.sin(time * 0.5 + angles[i]) * 0.01;
+      const a  = angles[i];
+      const hx = pos.x + Math.cos(a) * radii[i];
+      const hz = pos.z + Math.sin(a) * radii[i];
+      const hy = linePositions[i * 6 + 1] + Math.sin(time * 0.5 + a) * 0.01;
+
+      // Head
+      linePositions[i * 6    ] = hx;
+      linePositions[i * 6 + 1] = hy;
+      linePositions[i * 6 + 2] = hz;
+      // Tail: CCW tangent direction is (-sin(a), 0, cos(a)), so tail trails behind
+      linePositions[i * 6 + 3] = hx + Math.sin(a) * LINE_LEN;
+      linePositions[i * 6 + 4] = hy;
+      linePositions[i * 6 + 5] = hz - Math.cos(a) * LINE_LEN;
     }
   },
 
   _updateThunderstorm(time) {
-    const { positions, altitudes } = AppState.stormParticleData;
+    const { linePositions, altitudes } = AppState.stormParticleData;
     const pos      = Config.settings.thunderstormPosition;
     const maxY     = CONSTANTS.FLIGHT_LEVELS.COUNT * CONSTANTS.GRID.SPACING;
     const RISE     = this.OPTIONS.THUNDERSTORM_RISE_SPEED;
     const COLUMN_R = 1.5;
     const count    = this.OPTIONS.THUNDERSTORM_PARTICLES;
+    const LINE_LEN = this.OPTIONS.LINE_LENGTH;
 
     for (let i = 0; i < count; i++) {
       altitudes[i] += RISE;
-      positions[i * 3 + 1] = altitudes[i];
+      const px = linePositions[i * 6    ];
+      const pz = linePositions[i * 6 + 2];
+      const py = altitudes[i];
+
+      // Head
+      linePositions[i * 6 + 1] = py;
+      // Tail trails below (particle rises upward)
+      linePositions[i * 6 + 4] = py - LINE_LEN;
 
       if (altitudes[i] > maxY) {
         altitudes[i] = 0;
         const angle = Math.random() * Math.PI * 2;
         const r     = Math.random() * COLUMN_R;
-        positions[i * 3    ] = pos.x + Math.cos(angle) * r;
-        positions[i * 3 + 2] = pos.z + Math.sin(angle) * r;
+        const nx    = pos.x + Math.cos(angle) * r;
+        const nz    = pos.z + Math.sin(angle) * r;
+        linePositions[i * 6    ] = nx;  linePositions[i * 6 + 1] = 0;           linePositions[i * 6 + 2] = nz;
+        linePositions[i * 6 + 3] = nx;  linePositions[i * 6 + 4] = -LINE_LEN;   linePositions[i * 6 + 5] = nz;
       }
     }
 
