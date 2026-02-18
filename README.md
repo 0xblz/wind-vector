@@ -8,9 +8,10 @@
 - Animated wind-line particles flowing through the scene, speed-scaled by local wind intensity
 - Leaflet map panel with multiple tile layers (OpenStreetMap, Satellite, Terrain)
 - Resizable split-panel layout
-- Weather simulations (thunderstorm, hurricane categories 1–5)
-- Date/time controls and wind randomization
-- Options: dark background, wind particles, wind direction arrows, cube opacity, particle brightness
+- Weather simulations (thunderstorm, hurricane categories 1–5) selected via radio buttons
+- Hover/click flight level slices to isolate and inspect altitude layers; FL200 selected by default
+- Date/time controls
+- Wind section: wind direction arrows, wind particles + brightness, cube opacity
 
 ## Stack
 
@@ -54,7 +55,7 @@ Three files loaded in order: `wind-vector-core.js`, `wind-vector-systems.js`, th
 - `Utils` — formatting, color calculation, coordinate transforms
 - `WindCalculator` — wind direction/speed generation (regional patterns, storms, altitude)
 - `WindGenerator` — creates/clears the 3D cube grid, builds `windFieldMap` and `windSpeedMap`
-- `SceneManager` — Three.js scene, camera, renderer, controls, lighting, ground plane
+- `SceneManager` — Three.js scene, camera, renderer, controls, lighting, ground plane, slice outline frames
 - `SelectionManager` — flight level selection, arrow/particle visibility toggles
 - `LabelsManager` — 3D text sprites (flight levels, compass)
 - `MapManager` — Leaflet map init, tile management, texture capture for ground plane
@@ -63,7 +64,7 @@ Three files loaded in order: `wind-vector-core.js`, `wind-vector-systems.js`, th
 **Systems** (`wind-vector-systems.js`) — depends on core:
 - `MaterialPool` — 5 shared `MeshLambertMaterial` instances keyed by wind speed bucket
 - `ArrowSystem` — `InstancedMesh` of 3D arrow instances per flight level, with wobble animation
-- `ParticleSystem` — 800 `LineSegments` wind streaks flowing through the scene; particle speed scales with local wind intensity via `windSpeedMap`
+- `ParticleSystem` — 100 `LineSegments` wind streaks flowing through the scene; particle speed scales with local wind intensity via `windSpeedMap`
 - `SlabSystem` — bilinearly-interpolated canvas heatmap shown on flight level selection
 - `StormSystem` — hurricane spiral lines + thunderstorm updraft lines, each with a point light
 
