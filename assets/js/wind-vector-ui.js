@@ -396,6 +396,11 @@ const EventHandlers = {
       AppState.renderer.domElement.style.cursor = 'pointer';
       UIManager.showTooltip(cubeToShow, event.clientX, event.clientY);
 
+      if (AppState.hoverOutline) {
+        AppState.hoverOutline.position.y = hoveredCube.userData.yLevel * CONSTANTS.GRID.SPACING + 1.05;
+        AppState.hoverOutline.visible = true;
+      }
+
       if (AppState.selectedFlightLevel === null) {
         this.applyHoverEffects(hoveredCube.userData.yLevel);
       }
@@ -410,6 +415,7 @@ const EventHandlers = {
       AppState.renderer.domElement.style.cursor = 'move';
     }
     UIManager.hideTooltip();
+    if (AppState.hoverOutline) AppState.hoverOutline.visible = false;
 
     if (AppState.selectedFlightLevel === null) {
       AppState.windCubes.forEach(cube => {
@@ -657,6 +663,7 @@ const Splitter = {
 
 function initApp() {
   SceneManager.init();         // renderer, camera, scene, lighting, ground plane, arrow geometry
+  SceneManager.createSliceOutlines();
   MaterialPool.build();        // 5 shared materials — must come before WindGenerator
   MapManager.init();
   WindGenerator.generateGrid(); // cubes + windFieldMap

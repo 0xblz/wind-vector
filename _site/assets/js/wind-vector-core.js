@@ -114,6 +114,10 @@ const AppState = {
   sharedMaterials:         [],
   sharedWireframeMaterial: null,
 
+  // Slice outlines (hover + selected)
+  hoverOutline:    null,
+  selectedOutline: null,
+
   // Lights (stored for dynamic updates)
   hemiLight: null,
   dirLight:  null,
@@ -822,6 +826,36 @@ const SceneManager = {
     // Clean up intermediate geometries
     shaftGeometry.dispose();
     headGeometry.dispose();
+  },
+
+  _makeFrameGroup(opacity) {
+    const E   = CONSTANTS.GRID.RANGE + CONSTANTS.GRID.SPACING / 2; // 10
+    const T   = 0.10; // bar thickness
+    const mat = new THREE.MeshBasicMaterial({
+      color: CONSTANTS.COLORS.ARROW, transparent: opacity < 1, opacity
+    });
+    const group = new THREE.Group();
+    [
+      { size: [E * 2, T, T], pos: [ 0, 0, -E] },
+      { size: [E * 2, T, T], pos: [ 0, 0,  E] },
+      { size: [T, T, E * 2], pos: [-E, 0,  0] },
+      { size: [T, T, E * 2], pos: [ E, 0,  0] }
+    ].forEach(({ size, pos }) => {
+      const mesh = new THREE.Mesh(new THREE.BoxGeometry(...size), mat);
+      mesh.position.set(...pos);
+      group.add(mesh);
+    });
+    return group;
+  },
+
+  createSliceOutlines() {
+    AppState.hoverOutline = this._makeFrameGroup(0.5);
+    AppState.hoverOutline.visible = false;
+    AppState.scene.add(AppState.hoverOutline);
+
+    AppState.selectedOutline = this._makeFrameGroup(1.0);
+    AppState.selectedOutline.visible = false;
+    AppState.scene.add(AppState.selectedOutline);
   }
 };
 
@@ -833,6 +867,11 @@ const SelectionManager = {
   selectFlightLevel(yLevel) {
     this.deselectFlightLevel();
     AppState.selectedFlightLevel = yLevel;
+
+    if (AppState.selectedOutline) {
+      AppState.selectedOutline.position.y = yLevel * CONSTANTS.GRID.SPACING + 1.05;
+      AppState.selectedOutline.visible = true;
+    }
 
     AppState.windCubes.forEach(cube => {
       cube.material.opacity = cube.userData.yLevel === yLevel
@@ -855,6 +894,8 @@ const SelectionManager = {
     AppState.selectedFlightLevel = null;
     AppState.selectedCubes.forEach(wireframe => AppState.scene.remove(wireframe));
     AppState.selectedCubes = [];
+
+    if (AppState.selectedOutline) AppState.selectedOutline.visible = false;
 
     AppState.windCubes.forEach(cube => {
       cube.material.opacity = Config.settings.cubeOpacity;
