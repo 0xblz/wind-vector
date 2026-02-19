@@ -26,10 +26,11 @@ const MaterialPool = {
     ];
 
     AppState.sharedMaterials = bucketColors.map(hex =>
-      new THREE.MeshLambertMaterial({
+      new THREE.MeshBasicMaterial({
         color: hex,
         transparent: true,
-        opacity: Config.settings.cubeOpacity
+        opacity: Config.settings.cubeOpacity,
+        depthWrite: false
       })
     );
 

@@ -119,9 +119,6 @@ const AppState = {
   selectedOutline: null,
 
   // Lights (stored for dynamic updates)
-  hemiLight: null,
-  dirLight:  null,
-  fillLight: null,
 
   // Interaction
   raycaster:         new THREE.Raycaster(),
@@ -648,10 +645,11 @@ const WindGenerator = {
     // Clone from pool so each cube owns its material — required for per-cube opacity control
     const material = (AppState.sharedMaterials && AppState.sharedMaterials.length)
       ? MaterialPool.getMaterial(speed).clone()
-      : new THREE.MeshLambertMaterial({
+      : new THREE.MeshBasicMaterial({
           color: CONSTANTS.COLORS.WIND_SPEED.CALM,
           transparent: true,
-          opacity: Config.settings.cubeOpacity
+          opacity: Config.settings.cubeOpacity,
+          depthWrite: false
         });
     material.opacity = Config.settings.cubeOpacity;
 
@@ -691,7 +689,6 @@ const SceneManager = {
     this.setupCamera();
     this.setupRenderer();
     this.setupControls();
-    this.setupLighting();
     this.createGroundPlane();
     this.createArrowGeometry();
   },
@@ -760,24 +757,6 @@ const SceneManager = {
     AppState.controls.update();
   },
 
-  setupLighting() {
-    // Hemisphere light: near-white sky keeps material colors true, dark ground for contrast
-    const hemiLight = new THREE.HemisphereLight(0xffffff, 0x223322, 0.9);
-    AppState.scene.add(hemiLight);
-    AppState.hemiLight = hemiLight;
-
-    // Primary directional key light: NE quadrant, ~45 degrees elevation
-    const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
-    dirLight.position.set(8, 14, 6);
-    AppState.scene.add(dirLight);
-    AppState.dirLight = dirLight;
-
-    // Soft fill from opposite side to prevent full shadowing
-    const fillLight = new THREE.DirectionalLight(0xffffff, 0.4);
-    fillLight.position.set(-6, 4, -8);
-    AppState.scene.add(fillLight);
-    AppState.fillLight = fillLight;
-  },
 
   updateBackgroundColor(isDark) {
     const color = isDark ? CONSTANTS.COLORS.BACKGROUND.DARK : CONSTANTS.COLORS.BACKGROUND.LIGHT;
@@ -797,7 +776,6 @@ const SceneManager = {
 
     AppState.mapTexture = new THREE.CanvasTexture(AppState.mapCanvas);
 
-    // MeshBasicMaterial ignores scene lighting — map renders at its own true brightness
     const material = new THREE.MeshBasicMaterial({ map: AppState.mapTexture });
     AppState.groundPlane            = new THREE.Mesh(geometry, material);
     AppState.groundPlane.rotation.x = -Math.PI / 2;
