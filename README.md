@@ -55,14 +55,14 @@ Three files loaded in order: `wind-vector-core.js`, `wind-vector-systems.js`, th
 - `Utils` — formatting, color calculation, coordinate transforms
 - `WindCalculator` — wind direction/speed generation (regional patterns, storms, altitude)
 - `WindGenerator` — creates/clears the 3D cube grid, builds `windFieldMap` and `windSpeedMap`
-- `SceneManager` — Three.js scene, camera, renderer, controls, lighting, ground plane, slice outline frames
+- `SceneManager` — Three.js scene, camera, renderer, controls, ground plane, slice outline frames
 - `SelectionManager` — flight level selection, arrow/particle visibility toggles
 - `LabelsManager` — 3D text sprites (flight levels, compass)
 - `MapManager` — Leaflet map init, tile management, texture capture for ground plane
 - `AnimationLoop` — requestAnimationFrame loop
 
 **Systems** (`wind-vector-systems.js`) — depends on core:
-- `MaterialPool` — 5 shared `MeshLambertMaterial` instances keyed by wind speed bucket
+- `MaterialPool` — 5 shared `MeshBasicMaterial` instances keyed by wind speed bucket
 - `ArrowSystem` — `InstancedMesh` of 3D arrow instances per flight level, with wobble animation
 - `ParticleSystem` — 100 `LineSegments` wind streaks flowing through the scene; particle speed scales with local wind intensity via `windSpeedMap`
 - `SlabSystem` — bilinearly-interpolated canvas heatmap shown on flight level selection
@@ -82,8 +82,8 @@ Three files loaded in order: `wind-vector-core.js`, `wind-vector-systems.js`, th
 - Global namespace — modules reference each other directly (e.g., `AppState.scene`)
 - Three.js uses legacy global `THREE` object (r128, not module imports)
 - OrbitControls and BufferGeometryUtils loaded from CDN as globals
-- Ground plane texture is captured from Leaflet tiles via canvas (`MeshBasicMaterial` — unaffected by scene lighting)
-- Wind cubes are `THREE.Mesh` with shared `BoxGeometry` and per-cube cloned `MeshLambertMaterial`
+- Ground plane texture is captured from Leaflet tiles via canvas (`MeshBasicMaterial`)
+- Wind cubes are `THREE.Mesh` with shared `BoxGeometry` and per-cube cloned `MeshBasicMaterial` (`depthWrite: false` for correct transparency)
 - Wind particles are `THREE.LineSegments` with head/tail vertices updated each frame; tail trails in the opposite of the velocity direction
 - `windFieldMap` and `windSpeedMap` are O(1) `Map` lookups built after grid generation
 - Storm simulations use `LineSegments` (spiral for hurricane, vertical for thunderstorm) + `PointLight`
