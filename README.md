@@ -19,7 +19,7 @@
 - **Three.js** r128 (via CDN) — 3D wind field rendering
 - **Leaflet** 1.9.4 (via CDN) — interactive map panel
 - **Vanilla JS** — no frameworks, no bundler
-- **CSS** — single stylesheet, no preprocessor
+- **SCSS** — single stylesheet compiled by Jekyll's built-in Sass
 - **Font Awesome** — icons (loaded via kit)
 - **Ubuntu Mono** — primary font (Google Fonts)
 
@@ -31,7 +31,7 @@
   _layouts/default.html             # HTML shell, CDN scripts, GA tag
   _config.yml                       # Jekyll config (title, description)
   assets/
-    css/style.css                   # All styles (single file)
+    css/style.scss                  # All styles (single file, compiled by Jekyll)
     js/
       wind-vector-core.js           # Data, calculations, 3D scene, visualization
       wind-vector-systems.js        # GPU systems: materials, arrows, particles, slabs, storms
@@ -102,7 +102,7 @@ Three files loaded in order: `wind-vector-core.js`, `wind-vector-systems.js`, th
 - CSS custom properties: `--font-family`, `--secondary-color` (#00bfff)
 - Font: Ubuntu Mono monospace
 - Dark theme (black bg, white text)
-- rem units for spacing, no preprocessor variables
+- rem units for spacing, SCSS variables for shared values (e.g. `$mobile-panel-height`)
 - Single file — no partials or imports (besides Google Fonts)
 
 ## Development
