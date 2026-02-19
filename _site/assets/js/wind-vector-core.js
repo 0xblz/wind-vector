@@ -932,6 +932,9 @@ const SelectionManager = {
     if (AppState.particleSystem) {
       AppState.particleSystem.visible = show;
     }
+    if (AppState.stormParticleSystem) {
+      AppState.stormParticleSystem.visible = show;
+    }
   }
 };
 

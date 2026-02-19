@@ -60,7 +60,6 @@ const UIManager = {
 this.setupWindParticlesToggle();
     this.setupWindArrowsToggle();
     this.setupCubeOpacitySlider();
-    this.setupParticleOpacitySlider();
     this.setupStormControls();
     TimeControls.setupControls();
   },
@@ -92,14 +91,12 @@ this.setupWindParticlesToggle();
   },
 
   setupWindParticlesToggle() {
-    const checkbox       = document.getElementById('gui-wind-particles');
-    const brightnessCtrl = document.getElementById('gui-particle-opacity-control');
+    const checkbox = document.getElementById('gui-wind-particles');
     if (!checkbox) return;
 
     checkbox.checked = Config.settings.showWindParticles;
     checkbox.addEventListener('change', (e) => {
       SelectionManager.toggleWindParticles(e.target.checked);
-      if (brightnessCtrl) brightnessCtrl.style.display = e.target.checked ? '' : 'none';
     });
   },
 
@@ -137,18 +134,6 @@ this.setupWindParticlesToggle();
           }
         });
       }
-    });
-  },
-
-  setupParticleOpacitySlider() {
-    const slider = document.getElementById('gui-particle-opacity');
-    const value  = document.getElementById('gui-particle-opacity-value');
-    if (!slider || !value) return;
-
-    slider.addEventListener('input', (e) => {
-      const opacity    = parseFloat(e.target.value);
-      value.textContent = opacity.toFixed(2);
-      ParticleSystem.setOpacity(opacity);
     });
   },
 
