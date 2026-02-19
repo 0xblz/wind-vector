@@ -625,9 +625,11 @@ const Splitter = {
     if (!guiPanel || !controlsSplitter || !appContainer) return;
 
     if (this.isMobile()) {
-      const guiHeight = guiPanel.offsetHeight;
+      const headerHeight = document.getElementById('site-header')?.offsetHeight || 40;
+      const guiHeight    = guiPanel.offsetHeight;
+      const availHeight  = window.innerHeight - headerHeight;
       controlsSplitter.style.setProperty('bottom', `${guiHeight}px`, 'important');
-      appContainer.style.setProperty('height', `calc(100dvh - ${guiHeight}px - 12px)`, 'important');
+      appContainer.style.setProperty('height', `${availHeight - guiHeight - 12}px`, 'important');
     } else {
       const guiWidth = guiPanel.offsetWidth;
       controlsSplitter.style.setProperty('right', `${guiWidth}px`, 'important');

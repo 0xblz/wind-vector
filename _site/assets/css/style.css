@@ -667,7 +667,7 @@ textarea {
 @media screen and (max-width: 800px) {
   #app-container {
     width: 100vw;
-    height: calc(50dvh - 6px - 1.25rem);
+    height: calc((100svh - 2.5rem - 12px) / 2);
     top: 2.5rem;
   }
   #map-panel {
@@ -683,11 +683,12 @@ textarea {
     bottom: 0;
     left: 0;
     width: auto;
-    height: calc(50dvh - 6px - 1.25rem);
+    height: calc((100svh - 2.5rem - 12px) / 2);
+    padding-bottom: calc(6rem + env(safe-area-inset-bottom, 0px));
   }
   #controls-splitter {
     top: auto;
-    bottom: calc(50dvh - 6px - 1.25rem);
+    bottom: calc((100svh - 2.5rem - 12px) / 2);
     left: 0;
     right: 0;
     width: auto;

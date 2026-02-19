@@ -719,9 +719,12 @@ textarea {
 
 // Mobile
 @media screen and (max-width: 800px) {
+  // (100svh - header - splitter) / 2 — svh = smallest viewport (browser bar visible)
+  $mobile-panel-height: calc((100svh - 2.5rem - 12px) / 2);
+
   #app-container {
     width: 100vw;
-    height: calc(50dvh - 6px - 2.5rem / 2);
+    height: $mobile-panel-height;
     top: 2.5rem;
   }
 
@@ -740,12 +743,13 @@ textarea {
     bottom: 0;
     left: 0;
     width: auto;
-    height: calc(50dvh - 6px - 2.5rem / 2);
+    height: $mobile-panel-height;
+    padding-bottom: calc(6rem + env(safe-area-inset-bottom, 0px));
   }
 
   #controls-splitter {
     top: auto;
-    bottom: calc(50dvh - 6px - 2.5rem / 2);
+    bottom: $mobile-panel-height;
     left: 0;
     right: 0;
     width: auto;
