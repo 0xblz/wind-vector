@@ -139,11 +139,15 @@ this.setupWindParticlesToggle();
 
   setupStormControls() {
     const stormRadios = document.querySelectorAll('[name="storm-mode"]');
+    const hurricaneIntensityControl = document.getElementById('gui-hurricane-intensity-control');
     stormRadios.forEach((radio) => {
       radio.addEventListener('change', (e) => {
         const mode = e.target.value;
         Config.settings.thunderstormActive = mode === 'thunderstorm';
         Config.settings.hurricaneActive    = mode === 'hurricane';
+        if (hurricaneIntensityControl) {
+          hurricaneIntensityControl.style.display = mode === 'hurricane' ? '' : 'none';
+        }
         if (mode === 'none') {
           this.onStormToggle(null, false);
         } else {
