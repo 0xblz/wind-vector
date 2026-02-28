@@ -1,9 +1,35 @@
-title: Wind Vector
-description: A 3D visualization of wind patterns across US states
-url: ""
+# Site settings
+title: "Wind Vector"
+description: "A 3D visualization of wind patterns across US states"
+author: "blaze"
+url: "https://wind-vector.blaze.design"
 baseurl: ""
 
-exclude:
-  - Gemfile
-  - Gemfile.lock
-  - README.md
+# Build settings
+source: .
+destination: ./_site
+include: ['.htaccess']
+exclude: ['Gemfile', 'Gemfile.lock', 'node_modules', '.git', '.gitignore', 'includes']
+keep_files: []
+
+# Plugins
+plugins:
+  - jekyll-seo-tag
+
+# Defaults
+defaults:
+  - scope:
+      path: ""
+      type: "pages"
+    values:
+      layout: "default"
+
+# Markdown
+highlighter: rouge
+markdown: kramdown
+
+# Sass/SCSS
+sass:
+  sass_dir: _sass
+  style: compressed
+

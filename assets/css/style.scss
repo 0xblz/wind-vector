@@ -128,16 +128,12 @@ textarea {
   display: flex;
   align-items: center;
   text-decoration: none;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 1.25rem;
+  transition: color 0.2s ease;
 
-  img {
-    height: 1.25rem;
-    width: auto;
-    opacity: 0.9;
-    transition: opacity 0.2s ease;
-  }
-
-  &:hover img {
-    opacity: 1;
+  &:hover {
+    color: #fff;
   }
 }
 
